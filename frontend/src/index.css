@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@source "../../tailwind.config.js";
+
+@theme {
+  /* Colors using oklch color space */
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(20% 0.03 285.9);
+  
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(20% 0.03 285.9);
+  
+  --color-primary: oklch(55% 0.25 264);
+  --color-primary-foreground: oklch(99% 0 0);
+  
+  --color-secondary: oklch(96% 0.01 285.9);
+  --color-secondary-foreground: oklch(20% 0.03 285.9);
+  
+  --color-muted: oklch(96% 0.01 285.9);
+  --color-muted-foreground: oklch(50% 0.02 285.9);
+  
+  --color-accent: oklch(96% 0.01 285.9);
+  --color-accent-foreground: oklch(20% 0.03 285.9);
+  
+  --color-destructive: oklch(60% 0.22 29);
+  --color-destructive-foreground: oklch(99% 0 0);
+  
+  --color-border: oklch(92% 0.01 285.9);
+  --color-input: oklch(92% 0.01 285.9);
+  --color-ring: oklch(55% 0.25 264);
+  
+  /* Radius */
+  --radius-lg: 0.5rem;
+  --radius-md: calc(var(--radius-lg) - 2px);
+  --radius-sm: calc(var(--radius-lg) - 4px);
+  
+  /* Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-scale-in: scale-in 0.3s ease-out;
+  
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slide-up {
+    from { 
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes scale-in {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  font-family: system-ui, -apple-system, sans-serif;
+}

@@ -1,0 +1,124 @@
+pytest
+============================================================= test session starts ==============================================================
+platform darwin -- Python 3.13.8, pytest-8.4.2, pluggy-1.6.0 -- /Users/sachin/Desktop/Codes/JobGlove/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/sachin/Desktop/Codes/JobGlove/backend
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.11.0
+collected 53 items                                                                                                                             
+
+tests/test_database.py::TestDatabaseModels::test_create_resume PASSED                                                                    [  1%]
+tests/test_database.py::TestDatabaseModels::test_resume_to_dict PASSED                                                                   [  3%]
+tests/test_database.py::TestDatabaseModels::test_resume_versions_relationship PASSED                                                     [  5%]
+tests/test_database.py::TestDatabaseModels::test_create_score PASSED                                                                     [  7%]
+tests/test_database.py::TestDatabaseModels::test_score_to_dict PASSED                                                                    [  9%]
+tests/test_database.py::TestDatabaseModels::test_create_review_bullet PASSED                                                             [ 11%]
+tests/test_database.py::TestDatabaseModels::test_resume_cascade_delete PASSED                                                            [ 13%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_escape_latex PASSED                                                              [ 15%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_escape_latex_special_chars PASSED                                                [ 16%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_percentages PASSED                                                  [ 18%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_currency PASSED                                                     [ 20%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_large_numbers PASSED                                                [ 22%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_ranges PASSED                                                       [ 24%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_abbreviated PASSED                                                  [ 26%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_multipliers PASSED                                                  [ 28%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_bold_metrics_years PASSED                                                        [ 30%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_finalize_bold_and_escape PASSED                                                  [ 32%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_finalize_bold_and_escape_preserves_bold PASSED                                   [ 33%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_with_user_info FAILED                                    [ 35%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_sanitization FAILED                                      [ 37%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_without_user_info FAILED                                 [ 39%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_parse_structured_resume PASSED                                                   [ 41%]
+tests/test_latex_generator.py::TestLaTeXGenerator::test_escape_latex_backslash PASSED                                                    [ 43%]
+tests/test_review_service.py::TestReviewService::test_review_resume_success PASSED                                                       [ 45%]
+tests/test_review_service.py::TestReviewService::test_review_resume_handles_markdown PASSED                                              [ 47%]
+tests/test_review_service.py::TestReviewService::test_review_resume_invalid_json_uses_fallback PASSED                                    [ 49%]
+tests/test_review_service.py::TestReviewService::test_review_resume_exception_uses_fallback PASSED                                       [ 50%]
+tests/test_review_service.py::TestReviewService::test_review_fallback_extracts_bullets PASSED                                            [ 52%]
+tests/test_review_service.py::TestReviewService::test_review_fallback_identifies_sections PASSED                                         [ 54%]
+tests/test_review_service.py::TestReviewService::test_review_fallback_handles_empty_resume PASSED                                        [ 56%]
+tests/test_review_service.py::TestReviewService::test_create_review_service PASSED                                                       [ 58%]
+tests/test_review_service.py::TestReviewService::test_review_prompt_includes_resume_and_job PASSED                                       [ 60%]
+tests/test_review_service.py::TestReviewService::test_review_all_bullets_have_required_fields PASSED                                     [ 62%]
+tests/test_routes.py::TestResumeRoutes::test_check_apis_endpoint PASSED                                                                  [ 64%]
+tests/test_routes.py::TestResumeRoutes::test_score_endpoint_success PASSED                                                               [ 66%]
+tests/test_routes.py::TestResumeRoutes::test_score_endpoint_missing_fields PASSED                                                        [ 67%]
+tests/test_routes.py::TestResumeRoutes::test_review_endpoint_success PASSED                                                              [ 69%]
+tests/test_routes.py::TestResumeRoutes::test_review_endpoint_missing_fields PASSED                                                       [ 71%]
+tests/test_routes.py::TestResumeRoutes::test_history_endpoint_empty PASSED                                                               [ 73%]
+tests/test_routes.py::TestResumeRoutes::test_history_endpoint_with_resumes PASSED                                                        [ 75%]
+tests/test_routes.py::TestResumeRoutes::test_search_endpoint_with_query PASSED                                                           [ 77%]
+tests/test_routes.py::TestResumeRoutes::test_search_endpoint_without_query PASSED                                                        [ 79%]
+tests/test_routes.py::TestResumeRoutes::test_tailor_resume_endpoint_with_new_fields PASSED                                               [ 81%]
+tests/test_routes.py::TestResumeRoutes::test_tailor_resume_saves_to_database PASSED                                                      [ 83%]
+tests/test_scoring_service.py::TestScoringService::test_score_resume_success PASSED                                                      [ 84%]
+tests/test_scoring_service.py::TestScoringService::test_score_resume_handles_markdown_fences PASSED                                      [ 86%]
+tests/test_scoring_service.py::TestScoringService::test_score_resume_invalid_json_returns_fallback PASSED                                [ 88%]
+tests/test_scoring_service.py::TestScoringService::test_score_resume_calculates_total PASSED                                             [ 90%]
+tests/test_scoring_service.py::TestScoringService::test_score_resume_exception_handling PASSED                                           [ 92%]
+tests/test_scoring_service.py::TestScoringService::test_create_scoring_service_openai PASSED                                             [ 94%]
+tests/test_scoring_service.py::TestScoringService::test_create_scoring_service_gemini PASSED                                             [ 96%]
+tests/test_scoring_service.py::TestScoringService::test_create_scoring_service_claude PASSED                                             [ 98%]
+tests/test_scoring_service.py::TestScoringService::test_scoring_prompt_includes_resume_and_job PASSED                                    [100%]
+
+=================================================================== FAILURES ===================================================================
+________________________________________ TestLaTeXGenerator.test_generate_latex_filename_with_user_info ________________________________________
+services/latex_generator.py:400: in generate_latex
+    raise Exception(f"LaTeX compilation failed: {result.stderr}")
+E   Exception: LaTeX compilation failed:
+
+During handling of the above exception, another exception occurred:
+tests/test_latex_generator.py:123: in test_generate_latex_filename_with_user_info
+    pdf_path, tex_path = LaTeXGenerator.generate_latex(
+services/latex_generator.py:420: in generate_latex
+    raise Exception(f"Error generating PDF: {str(e)}")
+E   Exception: Error generating PDF: LaTeX compilation failed:
+------------------------------------------------------------- Captured stderr call -------------------------------------------------------------
+2025-10-31 09:21:43 - jobglove - ERROR - LaTeX compilation failed for John_Doe_Tech_Corp_Software_Engineer_resume.tex
+2025-10-31 09:21:43 - jobglove - ERROR - Error generating PDF: LaTeX compilation failed: 
+-------------------------------------------------------------- Captured log call ---------------------------------------------------------------
+INFO     jobglove:latex_generator.py:389 Compiling LaTeX file: John_Doe_Tech_Corp_Software_Engineer_resume.tex
+ERROR    jobglove:latex_generator.py:399 LaTeX compilation failed for John_Doe_Tech_Corp_Software_Engineer_resume.tex
+ERROR    jobglove:latex_generator.py:419 Error generating PDF: LaTeX compilation failed:
+_________________________________________ TestLaTeXGenerator.test_generate_latex_filename_sanitization _________________________________________
+services/latex_generator.py:400: in generate_latex
+    raise Exception(f"LaTeX compilation failed: {result.stderr}")
+E   Exception: LaTeX compilation failed:
+
+During handling of the above exception, another exception occurred:
+tests/test_latex_generator.py:148: in test_generate_latex_filename_sanitization
+    pdf_path, tex_path = LaTeXGenerator.generate_latex(
+services/latex_generator.py:420: in generate_latex
+    raise Exception(f"Error generating PDF: {str(e)}")
+E   Exception: Error generating PDF: LaTeX compilation failed:
+------------------------------------------------------------- Captured stderr call -------------------------------------------------------------
+2025-10-31 09:21:43 - jobglove - ERROR - LaTeX compilation failed for John_OBrien_Tech__Co_Sr_Developer_resume.tex
+2025-10-31 09:21:43 - jobglove - ERROR - Error generating PDF: LaTeX compilation failed: 
+-------------------------------------------------------------- Captured log call ---------------------------------------------------------------
+INFO     jobglove:latex_generator.py:389 Compiling LaTeX file: John_OBrien_Tech__Co_Sr_Developer_resume.tex
+ERROR    jobglove:latex_generator.py:399 LaTeX compilation failed for John_OBrien_Tech__Co_Sr_Developer_resume.tex
+ERROR    jobglove:latex_generator.py:419 Error generating PDF: LaTeX compilation failed:
+______________________________________ TestLaTeXGenerator.test_generate_latex_filename_without_user_info _______________________________________
+services/latex_generator.py:400: in generate_latex
+    raise Exception(f"LaTeX compilation failed: {result.stderr}")
+E   Exception: LaTeX compilation failed:
+
+During handling of the above exception, another exception occurred:
+tests/test_latex_generator.py:172: in test_generate_latex_filename_without_user_info
+    pdf_path, tex_path = LaTeXGenerator.generate_latex(
+services/latex_generator.py:420: in generate_latex
+    raise Exception(f"Error generating PDF: {str(e)}")
+E   Exception: Error generating PDF: LaTeX compilation failed:
+------------------------------------------------------------- Captured stderr call -------------------------------------------------------------
+2025-10-31 09:21:43 - jobglove - ERROR - LaTeX compilation failed for f6a02312-36b3-4eb1-8f0d-6a4cfd6da636.tex
+2025-10-31 09:21:43 - jobglove - ERROR - Error generating PDF: LaTeX compilation failed: 
+-------------------------------------------------------------- Captured log call ---------------------------------------------------------------
+INFO     jobglove:latex_generator.py:389 Compiling LaTeX file: f6a02312-36b3-4eb1-8f0d-6a4cfd6da636.tex
+ERROR    jobglove:latex_generator.py:399 LaTeX compilation failed for f6a02312-36b3-4eb1-8f0d-6a4cfd6da636.tex
+ERROR    jobglove:latex_generator.py:419 Error generating PDF: LaTeX compilation failed:
+=========================================================== short test summary info ============================================================
+FAILED tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_with_user_info - Exception: Error generating PDF: LaTeX compilation failed:
+FAILED tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_sanitization - Exception: Error generating PDF: LaTeX compilation failed:
+FAILED tests/test_latex_generator.py::TestLaTeXGenerator::test_generate_latex_filename_without_user_info - Exception: Error generating PDF: LaTeX compilation failed:
+================================================== 3 failed, 50 passed, 16 warnings in 0.33s
