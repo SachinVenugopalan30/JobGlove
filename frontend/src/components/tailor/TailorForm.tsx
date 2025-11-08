@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { fadeIn, slideUp } from '@/lib/animations';
+import { fadeIn } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 
 interface TailorFormProps {
@@ -14,6 +14,7 @@ interface TailorFormProps {
 
 export default function TailorForm({ onComplete }: TailorFormProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [userName, setUserName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [company, setCompany] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -31,8 +32,15 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
     try {
       const response = await fetch('/api/check-apis');
       const data = await response.json();
-      setAvailableApis(data);
-      const firstAvailable = Object.keys(data).find(api => data[api]);
+      
+      // Extract default_user_name separately
+      const { default_user_name, ...apiAvailability } = data;
+      
+      setAvailableApis(apiAvailability);
+      setUserName(default_user_name || '');
+      
+      // Set the first available API as default
+      const firstAvailable = Object.keys(apiAvailability).find(api => apiAvailability[api]);
       if (firstAvailable) {
         setSelectedApi(firstAvailable);
       }
@@ -76,7 +84,7 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
   };
 
   const handleSubmit = async () => {
-    if (!file || !jobTitle || !company || !jobDescription || !selectedApi) {
+    if (!file || !userName || !jobTitle || !company || !jobDescription || !selectedApi) {
       setError('Please fill in all fields');
       return;
     }
@@ -106,7 +114,7 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
           file_path: uploadData.file_path,
           job_description: jobDescription,
           api: selectedApi,
-          user_name: 'User',
+          user_name: userName,
           company: company,
           job_title: jobTitle,
         }),
@@ -125,7 +133,7 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
     }
   };
 
-  const canSubmit = file && jobTitle && company && jobDescription && selectedApi && !isLoading;
+  const canSubmit = file && userName && jobTitle && company && jobDescription && selectedApi && !isLoading;
 
   return (
     <motion.div
@@ -180,7 +188,15 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
           </div>
 
           {/* Job Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Your Name</label>
+              <Input
+                placeholder="John Doe"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium mb-2">Job Title</label>
               <Input
@@ -218,17 +234,21 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
               {Object.keys(availableApis).map((api) => (
                 <button
                   key={api}
-                  onClick={() => setSelectedApi(api)}
+                  onClick={() => availableApis[api] && setSelectedApi(api)}
                   disabled={!availableApis[api]}
                   className={cn(
                     'flex-1 py-2 px-4 rounded-lg border-2 transition-all capitalize',
-                    selectedApi === api
+                    selectedApi === api && availableApis[api]
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-muted hover:border-primary/50',
-                    !availableApis[api] && 'opacity-50 cursor-not-allowed'
+                    !availableApis[api] && 'opacity-40 cursor-not-allowed bg-muted/50 hover:border-muted grayscale'
                   )}
+                  title={!availableApis[api] ? 'API key not configured' : ''}
                 >
                   {api}
+                  {!availableApis[api] && (
+                    <span className="ml-1 text-xs">🔒</span>
+                  )}
                 </button>
               ))}
             </div>

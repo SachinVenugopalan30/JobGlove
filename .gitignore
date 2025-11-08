@@ -43,7 +43,7 @@ outputs/*
 # Logs
 # logs/
 # *.log
-
+.claude/
 # LaTeX
 *.aux
 *.log
@@ -52,6 +52,8 @@ outputs/*
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+claude.md
 
 # IDE
 .vscode/

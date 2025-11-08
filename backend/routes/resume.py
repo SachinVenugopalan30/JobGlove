@@ -24,7 +24,10 @@ def check_apis():
     """Check which API keys are available"""
     try:
         available_apis = Config.check_api_availability()
-        return jsonify(available_apis), 200
+        return jsonify({
+            **available_apis,
+            'default_user_name': Config.DEFAULT_USER_NAME
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -74,7 +77,7 @@ def tailor_resume():
         file_path = data.get('file_path')
         job_description = data.get('job_description')
         selected_api = data.get('api')
-        user_name = data.get('user_name', 'Unknown')
+        user_name = data.get('user_name', Config.DEFAULT_USER_NAME)
         company = data.get('company', 'Unknown')
         job_title = data.get('job_title', 'Unknown')
         custom_prompt = data.get('custom_prompt')
@@ -199,11 +202,8 @@ def download_resume(filename):
             app_logger.warning(f"Download requested for non-existent file: {filename}")
             return jsonify({'error': 'File not found'}), 404
 
-        # Determine download name based on file extension
-        if filename.endswith('.tex'):
-            download_name = 'tailored_resume.tex'
-        else:
-            download_name = 'tailored_resume.pdf'
+        # Use the actual filename for download (already contains user/company/job info)
+        download_name = filename
 
         app_logger.info(f"Serving file for download: {filename}")
         return send_file(file_path, as_attachment=True, download_name=download_name)

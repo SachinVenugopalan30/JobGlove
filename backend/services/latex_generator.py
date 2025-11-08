@@ -350,10 +350,16 @@ class LaTeXGenerator:
         try:
             # Generate filename
             if user_name and company and job_title:
-                # Sanitize filename components
-                safe_name = re.sub(r'[^\w\s-]', '', user_name).strip().replace(' ', '_')
-                safe_company = re.sub(r'[^\w\s-]', '', company).strip().replace(' ', '_')
-                safe_title = re.sub(r'[^\w\s-]', '', job_title).strip().replace(' ', '_')
+                # Sanitize filename components - remove special chars but keep spaces for proper word separation
+                safe_name = re.sub(r'[^\w\s-]', '', user_name).strip()
+                safe_company = re.sub(r'[^\w\s-]', '', company).strip()
+                safe_title = re.sub(r'[^\w\s-]', '', job_title).strip()
+                
+                # Replace multiple spaces with single space, then replace spaces with underscores
+                safe_name = re.sub(r'\s+', ' ', safe_name).replace(' ', '_')
+                safe_company = re.sub(r'\s+', ' ', safe_company).replace(' ', '_')
+                safe_title = re.sub(r'\s+', ' ', safe_title).replace(' ', '_')
+                
                 filename = f"{safe_name}_{safe_company}_{safe_title}_resume"
             else:
                 filename = str(uuid.uuid4())

@@ -9,6 +9,9 @@ class Config:
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
+    # User settings
+    DEFAULT_USER_NAME = os.getenv('DEFAULT_USER_NAME', 'User')
+
     # File upload settings
     MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 10485760))
     ALLOWED_EXTENSIONS = {'docx', 'doc', 'pdf'}
