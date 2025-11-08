@@ -259,12 +259,9 @@ npm run build
 
 - Multiple resume versions management
 - Resume comparison view
-- Custom LaTeX template support
-- Batch resume tailoring
+- In-app LaTeX editor for easy editing
 - Cover letter generation
-- Browser extension
-- Desktop application (Electron)
-- Mobile app
+- Browser extension to immediately send job description, job title and company to the web page from various job sites
 
 ## 🤝 Contributing
 

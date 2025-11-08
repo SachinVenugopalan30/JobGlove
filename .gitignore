@@ -43,7 +43,6 @@ outputs/*
 # Logs
 backend/logs/*
 !backend/logs/.gitkeep
-*.log
 .claude/
 # LaTeX
 *.aux

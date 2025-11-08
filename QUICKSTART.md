@@ -122,8 +122,10 @@ sudo chown -R $USER:$USER uploads outputs backend/logs
 ### File Upload Issues
 
 **"File too large":**
+```text
 - Max size is 10MB by default
 - Compress your PDF or convert to DOCX
+```
 
 **"Failed to extract text":**
 - Ensure your PDF is not scanned/image-based
@@ -141,7 +143,7 @@ sudo chown -R $USER:$USER uploads outputs backend/logs
 
 You know it's working when you see:
 
-```
+```text
 ✅ Container is healthy: docker-compose ps
 ✅ Logs show "Starting Flask server"
 ✅ Browser shows JobGlove homepage
