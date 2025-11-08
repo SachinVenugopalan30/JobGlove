@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { getScoreColor } from '@/lib/utils';
-import { fadeIn, slideUp } from '@/lib/animations';
+import { slideUp } from '@/lib/animations';
 
 interface ScoreItem {
   label: string;

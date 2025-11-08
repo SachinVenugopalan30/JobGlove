@@ -41,8 +41,9 @@ outputs/*
 !outputs/.gitkeep
 
 # Logs
-# logs/
-# *.log
+backend/logs/*
+!backend/logs/.gitkeep
+*.log
 .claude/
 # LaTeX
 *.aux

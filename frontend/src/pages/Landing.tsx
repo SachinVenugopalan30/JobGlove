@@ -1,12 +1,17 @@
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileEdit, PlusCircle, Sparkles } from 'lucide-react';
-import { fadeIn, slideUp, staggerContainer } from '@/lib/animations';
+import { slideUp, staggerContainer } from '@/lib/animations';
 
 export default function Landing() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'JobGlove';
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">

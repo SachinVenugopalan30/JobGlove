@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import CircularScore from '@/components/score/CircularScore';
-import { fadeIn, slideUp, staggerContainer } from '@/lib/animations';
+import { slideUp, staggerContainer } from '@/lib/animations';
 import { getScoreColor } from '@/lib/utils';
 
 interface Score {

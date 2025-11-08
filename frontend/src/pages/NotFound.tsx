@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -5,6 +6,10 @@ import { FileQuestion } from 'lucide-react';
 import { fadeIn, scaleIn } from '@/lib/animations';
 
 export default function NotFound() {
+  useEffect(() => {
+    document.title = 'JobGlove - Page Not Found';
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <motion.div

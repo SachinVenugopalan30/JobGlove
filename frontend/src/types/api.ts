@@ -1,6 +1,7 @@
 import type { Score, AnalyzeResponse } from './score';
 
-export type { AnalyzeResponse } from './score';
+// Re-export AnalyzeResponse for backward compatibility
+export type { AnalyzeResponse };
 
 export interface ApiError {
   error: string;

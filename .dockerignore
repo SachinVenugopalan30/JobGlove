@@ -1,0 +1,71 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+*.env
+!.env.example
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+backend/venv/
+backend/env/
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Application data
+uploads/*
+!uploads/.gitkeep
+outputs/*
+!outputs/.gitkeep
+backend/logs/*
+!backend/logs/.gitkeep
+
+# Documentation
+*.md
+!README.md
+docs/
+claude.md
+TESTING.md
+TODO
+
+# Test files
+**/tests/
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.test.py
+test_*.py
+backend/pytest.ini
+backend/run_tests.sh
+
+# Old/backup files
+frontend_old/
+*.backup
+*.bak
+*.old

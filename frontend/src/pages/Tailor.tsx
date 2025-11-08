@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles } from 'lucide-react';
@@ -26,6 +26,10 @@ interface TailorResults {
 export default function Tailor() {
   const navigate = useNavigate();
   const [results, setResults] = useState<TailorResults | null>(null);
+
+  useEffect(() => {
+    document.title = 'JobGlove - Tailor Resume';
+  }, []);
 
   const handleTailorComplete = (data: TailorResults) => {
     setResults(data);

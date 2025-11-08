@@ -1,4 +1,5 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 
 from routes.health import health_bp
@@ -7,7 +8,7 @@ from config import Config
 from utils.logger import app_logger
 from database.db import init_db
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
 # Configure Flask
@@ -17,6 +18,16 @@ app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
 # Register blueprints
 app.register_blueprint(health_bp, url_prefix='/api')
 app.register_blueprint(resume_bp, url_prefix='/api')
+
+# Serve frontend static files in production
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve frontend static files"""
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
