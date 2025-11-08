@@ -9,6 +9,11 @@ class Config:
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
+    # AI Model Configuration
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+    CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-haiku-4-5-20251001')
+
     # User settings
     DEFAULT_USER_NAME = os.getenv('DEFAULT_USER_NAME', 'User')
 

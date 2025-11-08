@@ -130,6 +130,9 @@ def tailor_resume():
 
         app_logger.info(f"AI scoring complete - Original: {original_score['total_score']}/100, Tailored: {tailored_score['total_score']}/100")
         app_logger.info(f"Received tailored resume from AI (length: {len(tailored_resume)} chars)")
+        
+        # Debug: Log first 500 chars of tailored resume to check structure
+        app_logger.debug(f"Tailored resume preview (first 500 chars): {tailored_resume[:500]}")
 
         # Prepend original header back to AI response
         complete_resume = header + "\n" + tailored_resume

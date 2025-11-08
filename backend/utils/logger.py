@@ -44,5 +44,5 @@ def setup_logger(name: str, log_file: str, level=logging.INFO):
 
     return logger
 
-# Application logger
-app_logger = setup_logger('jobglove', 'logs/jobglove.log')
+# Application logger - Set to DEBUG to capture detailed AI response info
+app_logger = setup_logger('jobglove', 'logs/jobglove.log', level=logging.DEBUG)

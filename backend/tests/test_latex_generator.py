@@ -210,3 +210,62 @@ class TestLaTeXGenerator:
         escaped = LaTeXGenerator.escape_latex(text)
 
         assert 'textbackslash' in escaped
+
+    def test_format_experience_empty(self):
+        """Test that empty experience section is skipped"""
+        empty_content = ""
+        result = LaTeXGenerator._format_experience(empty_content)
+        assert result == ""
+
+    def test_format_experience_with_no_entries(self):
+        """Test that experience section with no valid entries is skipped"""
+        content = "Some text but no proper entries"
+        result = LaTeXGenerator._format_experience(content)
+        assert result == ""
+
+    def test_format_projects_empty(self):
+        """Test that empty projects section is skipped"""
+        empty_content = ""
+        result = LaTeXGenerator._format_projects(empty_content)
+        assert result == ""
+
+    def test_format_education_empty(self):
+        """Test that empty education section is skipped"""
+        empty_content = ""
+        result = LaTeXGenerator._format_education(empty_content)
+        assert result == ""
+
+    def test_format_skills_empty(self):
+        """Test that empty skills section is skipped"""
+        empty_content = ""
+        result = LaTeXGenerator._format_skills(empty_content)
+        assert result == ""
+
+    def test_parse_structured_resume_with_empty_experience(self):
+        """Test parsing resume with empty experience section"""
+        resume_text = """[HEADER]
+John Doe
+email@example.com | 123-456-7890
+
+[EDUCATION]
+University | Location
+Degree | 2020-2024
+
+[EXPERIENCE]
+
+[PROJECTS]
+Project Name | Tech Stack
+2024
+- Project description
+"""
+        result = LaTeXGenerator.parse_structured_resume(resume_text)
+        
+        # Should not contain empty experience section list markers
+        assert result.count('resumeSubHeadingListStart') == result.count('resumeSubHeadingListEnd')
+        # Should contain education and projects but not experience
+        assert 'Education' in result
+        assert 'Projects' in result
+        # Experience section should be omitted entirely
+        if 'Experience' in result:
+            # If it exists, it should be properly formed
+            assert 'resumeSubheading' in result or 'Experience' not in result

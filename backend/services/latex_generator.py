@@ -104,19 +104,22 @@ class LaTeXGenerator:
                 current_section = part
             else:
                 content = part.strip()
+                section_latex = ""
 
                 if current_section == 'HEADER':
-                    header = LaTeXGenerator._format_header(content)
-                    if header:  # Only add if not empty
-                        latex_parts.append(header)
+                    section_latex = LaTeXGenerator._format_header(content)
                 elif current_section == 'EDUCATION':
-                    latex_parts.append(LaTeXGenerator._format_education(content))
+                    section_latex = LaTeXGenerator._format_education(content)
                 elif current_section == 'TECHNICAL SKILLS':
-                    latex_parts.append(LaTeXGenerator._format_skills(content))
+                    section_latex = LaTeXGenerator._format_skills(content)
                 elif current_section == 'EXPERIENCE':
-                    latex_parts.append(LaTeXGenerator._format_experience(content))
+                    section_latex = LaTeXGenerator._format_experience(content)
                 elif current_section == 'PROJECTS':
-                    latex_parts.append(LaTeXGenerator._format_projects(content))
+                    section_latex = LaTeXGenerator._format_projects(content)
+                
+                # Only add non-empty sections
+                if section_latex:
+                    latex_parts.append(section_latex)
 
         return '\n\n'.join(latex_parts)
 
@@ -166,10 +169,21 @@ class LaTeXGenerator:
 
     @staticmethod
     def _format_education(content: str) -> str:
-        """Format education section"""
-        latex = "\\section{Education}\n  \\resumeSubHeadingListStart\n"
-
+        """Format education section - skip if empty"""
         lines = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('(')]
+
+        # Check if there's any actual content (look for school entries with |)
+        has_content = False
+        for line in lines:
+            if '|' in line:
+                has_content = True
+                break
+        
+        # Skip the entire section if empty
+        if not has_content:
+            return ""
+        
+        latex = "\\section{Education}\n  \\resumeSubHeadingListStart\n"
 
         i = 0
         while i < len(lines):
@@ -195,16 +209,64 @@ class LaTeXGenerator:
 
     @staticmethod
     def _format_experience(content: str) -> str:
-        """Format experience section"""
-        latex = "\\section{Experience}\n  \\resumeSubHeadingListStart\n\n"
-
+        """Format experience section - skip if empty
+        
+        Handles two formats:
+        Format 1 (preferred - from prompt):
+            Company Name | Location
+            Job Title | Start Date - End Date
+            - Bullet points
+        
+        Format 2 (AI sometimes returns):
+            Job Title | Company Name | Location | Date
+            - Bullet points
+        """
         lines = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('(')]
+        
+        # Check if there's any actual content (look for company entries with |)
+        has_content = False
+        for line in lines:
+            if '|' in line and not line.startswith('-'):
+                has_content = True
+                break
+        
+        # Skip the entire section if empty
+        if not has_content:
+            app_logger.info("Experience section is empty, skipping")
+            return ""
+        
+        latex = "\\section{Experience}\n  \\resumeSubHeadingListStart\n\n"
 
         i = 0
         while i < len(lines):
             if '|' in lines[i] and not lines[i].startswith('-'):
                 parts = [p.strip() for p in lines[i].split('|')]
-                if len(parts) == 2:
+                
+                # Format 2: Single line with 4 parts (Title | Company | Location | Date)
+                if len(parts) == 4:
+                    title, company, location, date = parts
+                    
+                    company_esc = LaTeXGenerator.escape_latex(company)
+                    location_esc = LaTeXGenerator.escape_latex(location)
+                    title_esc = LaTeXGenerator.escape_latex(title)
+                    date_esc = LaTeXGenerator.escape_latex(date)
+                    
+                    latex += f"    \\resumeSubheading\n      {{{company_esc}}}{{{location_esc}}}\n      {{{title_esc}}}{{{date_esc}}}\n"
+                    latex += "      \\resumeItemListStart\n"
+                    
+                    i += 1
+                    while i < len(lines) and lines[i].startswith('-'):
+                        bullet = lines[i][1:].strip()
+                        bullet_bold = LaTeXGenerator.bold_metrics(bullet)
+                        bullet_esc = LaTeXGenerator.finalize_bold_and_escape(bullet_bold)
+                        latex += f"        \\resumeItem{{{bullet_esc}}}\n"
+                        i += 1
+                    
+                    latex += "      \\resumeItemListEnd\n\n"
+                    continue
+                    
+                # Format 1: Two lines (Company | Location, then Title | Date)
+                elif len(parts) == 2:
                     company, location = parts
 
                     if i + 1 < len(lines) and '|' in lines[i + 1] and not lines[i + 1].startswith('-'):
@@ -237,10 +299,14 @@ class LaTeXGenerator:
 
     @staticmethod
     def _format_skills(content: str) -> str:
-        """Format skills section"""
-        latex = "\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n"
-
+        """Format skills section - skip if empty"""
         lines = [line.strip() for line in content.split('\n') if line.strip() and ':' in line]
+
+        # Skip the entire section if empty
+        if not lines:
+            return ""
+        
+        latex = "\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n"
 
         for line in lines:
             if ':' in line:
@@ -258,10 +324,21 @@ class LaTeXGenerator:
 
     @staticmethod
     def _format_projects(content: str) -> str:
-        """Format projects section"""
-        latex = "\\section{Projects}\n    \\resumeSubHeadingListStart\n"
-
+        """Format projects section - skip if empty"""
         lines = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('(')]
+
+        # Check if there's any actual content (look for project entries with |)
+        has_content = False
+        for line in lines:
+            if '|' in line and not line.startswith('-'):
+                has_content = True
+                break
+        
+        # Skip the entire section if empty
+        if not has_content:
+            return ""
+        
+        latex = "\\section{Projects}\n    \\resumeSubHeadingListStart\n"
 
         i = 0
         while i < len(lines):

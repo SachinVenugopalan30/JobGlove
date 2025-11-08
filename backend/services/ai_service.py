@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
-import re
 import json
 import openai
 import google.generativeai as genai
@@ -58,12 +57,16 @@ class AIProvider(ABC):
         """Create prompt for scoring and tailoring in single request"""
         base_instructions = custom_prompt if custom_prompt else ""
 
-        return f"""You are an expert resume writer and analyst. Your task is to:
+        return f"""You are an expert resume writer and analyst. 
+
+CRITICAL INSTRUCTION: You MUST follow the exact formatting rules specified below. Pay special attention to the EXPERIENCE section format.
+
+Your task is to:
 1. Score the original resume against the job description
 2. Tailor the resume to match the job description
 3. Score the tailored resume
 
-Respond with ONLY a valid JSON object in this exact format (no markdown, no explanations):
+Respond with ONLY a valid JSON object in this exact format (no markdown code fences, no explanations):
 
 {{
   "original_score": {{
@@ -92,7 +95,7 @@ SCORING CRITERIA:
 - total_score: Weighted average of the above scores
 
 TAILORING REQUIREMENTS:
-Use this exact format for the tailored_resume text:
+Use this EXACT format for the tailored_resume text. Follow these formatting rules STRICTLY:
 
 [EDUCATION]
 School Name | Location
@@ -100,11 +103,28 @@ Degree Title | Graduation Date
 (Repeat for each education entry)
 
 [EXPERIENCE]
-Company Name | Location
-Job Title | Start Date - End Date
-- Bullet point describing achievement/responsibility
-- Bullet point describing achievement/responsibility
-- Bullet point describing achievement/responsibility
+CRITICAL: Each job entry MUST follow this EXACT 2-line format:
+Line 1: Company Name | Location
+Line 2: Job Title | Start Date - End Date
+Then bullet points starting with "-"
+
+CORRECT Example:
+Company Name | Location, Country
+Role | Month 2023 - Month 2025
+- Enhanced operational efficiency by 14% through predictive model deployment
+- Reduced costs by 10% using Random Forest and Clustering algorithms
+
+WRONG Example (DO NOT DO THIS):
+Role | Company | Location, Country | Month 2023 - Month 2025
+
+WRONG Example (DO NOT DO THIS):
+Role | Company | Location, Country
+Month 2023 - Month 2025
+
+DO NOT put all information on one line with 4 pipe separators.
+DO NOT put the date on a separate third line.
+ALWAYS use exactly 2 lines: "Company | Location" then "Title | Date".
+
 (Repeat for each job)
 
 [SKILLS]
@@ -123,7 +143,7 @@ REQUIREMENTS:
 1. Emphasize skills and experiences most relevant to the job description
 2. All bullet points should follow the "Accomplished X through Y using Z" template
 3. Keep original achievements but reframe them to align with the target role
-4. Use action verbs and quantify achievements where possible
+4. Use action verbs and quantify achievements where possible. Try and not repeat the same action verbs as much as possible.
 5. Use plain text only - DO NOT escape special characters (%, &, $, #, etc.)
 6. Maintain professional tone and consistency in tense
 {f"7. {base_instructions}" if base_instructions else ""}
@@ -134,27 +154,43 @@ Original Resume:
 Job Description:
 {job_description}
 
-CRITICAL: Return ONLY the JSON object. No markdown code blocks, no explanations."""
+RESPONSE FORMAT:
+- Return ONLY raw JSON starting with {{ and ending with }}
+- DO NOT wrap in markdown code blocks (no ```json or ```)
+- DO NOT add any explanatory text before or after the JSON
+- Start your response directly with the opening brace {{
+- End your response directly with the closing brace }}"""
 
     def _parse_json_response(self, response_text: str) -> Dict[str, Any]:
         """Parse JSON from AI response, handling markdown code blocks if present"""
         cleaned = response_text.strip()
 
+        # Remove markdown code fences at the start
         if cleaned.startswith("```json"):
             cleaned = cleaned[7:]
         elif cleaned.startswith("```"):
             cleaned = cleaned[3:]
 
+        # Remove markdown code fences at the end
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3]
 
         cleaned = cleaned.strip()
 
+        # Try to find the JSON object boundaries
+        # Look for the first '{' and last '}'
+        start_idx = cleaned.find('{')
+        end_idx = cleaned.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            cleaned = cleaned[start_idx:end_idx + 1]
+
         try:
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             app_logger.error(f"Failed to parse JSON response: {e}")
-            app_logger.error(f"Response text: {response_text[:500]}")
+            app_logger.error(f"Response text (first 1000 chars): {response_text[:1000]}")
+            app_logger.error(f"Response text (last 500 chars): {response_text[-500:]}")
             raise ValueError(f"AI returned invalid JSON: {str(e)}")
 
     def _create_prompt(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> str:
@@ -220,13 +256,15 @@ CRITICAL: Output ONLY the structured resume content following the exact format a
 class OpenAIProvider(AIProvider):
     def __init__(self, api_key: str):
         self.client = openai.OpenAI(api_key=api_key)
+        self.model = Config.OPENAI_MODEL
+        app_logger.info(f"OpenAI provider initialized with model: {self.model}")
 
     def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
         try:
-            app_logger.info("Calling OpenAI API for score and tailor (gpt-4o-mini)")
+            app_logger.info(f"Calling OpenAI API for score and tailor ({self.model})")
             prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert resume writer and analyst. Always respond with valid JSON."},
                     {"role": "user", "content": prompt}
@@ -244,10 +282,10 @@ class OpenAIProvider(AIProvider):
 
     def tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> str:
         try:
-            app_logger.info("Calling OpenAI API (gpt-4o-mini)")
+            app_logger.info(f"Calling OpenAI API ({self.model})")
             prompt = self._create_prompt(resume_text, job_description, custom_prompt)
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert resume writer."},
                     {"role": "user", "content": prompt}
@@ -264,9 +302,9 @@ class OpenAIProvider(AIProvider):
 
     def generate(self, prompt: str) -> str:
         try:
-            app_logger.info("Calling OpenAI API with custom prompt")
+            app_logger.info(f"Calling OpenAI API with custom prompt ({self.model})")
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model,
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
@@ -284,12 +322,14 @@ class OpenAIProvider(AIProvider):
 class GeminiProvider(AIProvider):
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp',
+        self.model_name = Config.GEMINI_MODEL
+        self.model = genai.GenerativeModel(self.model_name,
             generation_config={"response_mime_type": "application/json"})
+        app_logger.info(f"Gemini provider initialized with model: {self.model_name}")
 
     def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
         try:
-            app_logger.info("Calling Gemini API for score and tailor (gemini-2.0-flash-exp)")
+            app_logger.info(f"Calling Gemini API for score and tailor ({self.model_name})")
             prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
             response = self.model.generate_content(prompt)
             content = response.text
@@ -301,7 +341,7 @@ class GeminiProvider(AIProvider):
 
     def tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> str:
         try:
-            app_logger.info("Calling Gemini API (gemini-2.0-flash-exp)")
+            app_logger.info(f"Calling Gemini API ({self.model_name})")
             prompt = self._create_prompt(resume_text, job_description, custom_prompt)
             response = self.model.generate_content(prompt)
             content = response.text
@@ -313,7 +353,7 @@ class GeminiProvider(AIProvider):
 
     def generate(self, prompt: str) -> str:
         try:
-            app_logger.info("Calling Gemini API with custom prompt")
+            app_logger.info(f"Calling Gemini API with custom prompt ({self.model_name})")
             response = self.model.generate_content(prompt)
             content = response.text
             app_logger.info("Gemini API call successful")
@@ -326,13 +366,15 @@ class GeminiProvider(AIProvider):
 class ClaudeProvider(AIProvider):
     def __init__(self, api_key: str):
         self.client = anthropic.Anthropic(api_key=api_key)
+        self.model = Config.CLAUDE_MODEL
+        app_logger.info(f"Claude provider initialized with model: {self.model}")
 
     def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
         try:
-            app_logger.info("Calling Claude API for score and tailor (claude-3-5-haiku-20241022)")
+            app_logger.info(f"Calling Claude API for score and tailor ({self.model})")
             prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
             response = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model=self.model,
                 max_tokens=4000,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -340,17 +382,29 @@ class ClaudeProvider(AIProvider):
             )
             content = response.content[0].text
             app_logger.info("Claude API call successful")
-            return self._parse_json_response(content)
+            app_logger.debug(f"Claude response content (first 500 chars): {content[:500]}")
+            parsed_response = self._parse_json_response(content)
+            app_logger.debug(f"Parsed response keys: {parsed_response.keys()}")
+            
+            # Validate required keys
+            required_keys = ['original_score', 'tailored_resume', 'tailored_score']
+            missing_keys = [key for key in required_keys if key not in parsed_response]
+            if missing_keys:
+                app_logger.error(f"Missing required keys in Claude response: {missing_keys}")
+                app_logger.error(f"Available keys: {list(parsed_response.keys())}")
+                raise ValueError(f"Claude API returned incomplete response. Missing: {missing_keys}")
+            
+            return parsed_response
         except Exception as e:
             app_logger.error(f"Claude API error: {str(e)}")
             raise Exception(f"Claude API error: {str(e)}")
 
     def tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> str:
         try:
-            app_logger.info("Calling Claude API (claude-3-5-haiku-20241022)")
+            app_logger.info(f"Calling Claude API ({self.model})")
             prompt = self._create_prompt(resume_text, job_description, custom_prompt)
             response = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model=self.model,
                 max_tokens=2000,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -365,9 +419,9 @@ class ClaudeProvider(AIProvider):
 
     def generate(self, prompt: str) -> str:
         try:
-            app_logger.info("Calling Claude API with custom prompt")
+            app_logger.info(f"Calling Claude API with custom prompt ({self.model})")
             response = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model=self.model,
                 max_tokens=3000,
                 messages=[
                     {"role": "user", "content": prompt}

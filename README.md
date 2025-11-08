@@ -5,6 +5,7 @@
 ## ✨ Features
 
 - **Multi-AI Provider Support**: Choose between OpenAI GPT-4, Google Gemini, or Anthropic Claude
+- **Configurable AI Models**: Select specific models (gpt-4o, gemini-2.5-flash, claude-haiku-4-5-20251001, etc.) via environment variables
 - **Multiple Format Support**: Upload PDF or DOCX resumes
 - **AI-Powered Tailoring**: Automatically optimizes your resume for job descriptions
 - **Resume Scoring**: Get detailed scores on keyword matching, relevance, and ATS compatibility
@@ -162,6 +163,11 @@ OPENAI_API_KEY=your_openai_key_here
 GEMINI_API_KEY=your_gemini_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 
+# AI Model Configuration (optional - defaults shown)
+OPENAI_MODEL=gpt-4o-mini
+GEMINI_MODEL=gemini-2.5-flash
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+
 # Application Settings
 MAX_FILE_SIZE=10485760          # 10MB default
 DEFAULT_USER_NAME=User          # Default name for resumes
@@ -261,6 +267,7 @@ npm run build
 - Resume comparison view
 - In-app LaTeX editor for easy editing
 - Cover letter generation
+- Add support for Groq, Ollama and models within Ollama
 - Browser extension to immediately send job description, job title and company to the web page from various job sites
 
 ## 🤝 Contributing
