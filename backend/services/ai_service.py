@@ -7,6 +7,12 @@ import anthropic
 from utils.logger import app_logger
 from config import Config
 
+
+class IncompleteClaudeResponseError(Exception):
+    """Raised when Claude API returns a response missing required fields"""
+    pass
+
+
 class AIProvider(ABC):
     """Abstract base class for AI providers"""
 
@@ -369,6 +375,28 @@ class ClaudeProvider(AIProvider):
         self.model = Config.CLAUDE_MODEL
         app_logger.info(f"Claude provider initialized with model: {self.model}")
 
+    def _validate_score_response(self, parsed_response: Dict[str, Any]) -> None:
+        """
+        Validate that Claude's score_and_tailor_resume response contains all required fields.
+        
+        Args:
+            parsed_response: The parsed JSON response from Claude API
+            
+        Raises:
+            IncompleteClaudeResponseError: If any required keys are missing
+        """
+        required_keys = ['original_score', 'tailored_resume', 'tailored_score']
+        missing_keys = [key for key in required_keys if key not in parsed_response]
+        
+        if missing_keys:
+            available_keys = list(parsed_response.keys())
+            app_logger.error(f"Missing required keys in Claude response: {missing_keys}")
+            app_logger.error(f"Available keys: {available_keys}")
+            raise IncompleteClaudeResponseError(
+                f"Claude API returned incomplete response. Missing keys: {missing_keys}. "
+                f"Available keys: {available_keys}"
+            )
+
     def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
         try:
             app_logger.info(f"Calling Claude API for score and tailor ({self.model})")
@@ -383,18 +411,27 @@ class ClaudeProvider(AIProvider):
             content = response.content[0].text
             app_logger.info("Claude API call successful")
             app_logger.debug(f"Claude response content (first 500 chars): {content[:500]}")
-            parsed_response = self._parse_json_response(content)
-            app_logger.debug(f"Parsed response keys: {parsed_response.keys()}")
             
-            # Validate required keys
-            required_keys = ['original_score', 'tailored_resume', 'tailored_score']
-            missing_keys = [key for key in required_keys if key not in parsed_response]
-            if missing_keys:
-                app_logger.error(f"Missing required keys in Claude response: {missing_keys}")
-                app_logger.error(f"Available keys: {list(parsed_response.keys())}")
-                raise ValueError(f"Claude API returned incomplete response. Missing: {missing_keys}")
+            try:
+                parsed_response = self._parse_json_response(content)
+                app_logger.debug(f"Parsed response keys: {parsed_response.keys()}")
+            except (json.JSONDecodeError, ValueError) as parse_error:
+                app_logger.error(f"Failed to parse Claude response: {parse_error}")
+                raise IncompleteClaudeResponseError(
+                    f"Claude API returned invalid or unparseable response: {str(parse_error)}"
+                ) from parse_error
+            
+            # Validate required keys using extracted method
+            try:
+                self._validate_score_response(parsed_response)
+            except IncompleteClaudeResponseError as validation_error:
+                # Re-raise with full context
+                raise validation_error
             
             return parsed_response
+        except IncompleteClaudeResponseError:
+            # Re-raise our custom exceptions without wrapping
+            raise
         except Exception as e:
             app_logger.error(f"Claude API error: {str(e)}")
             raise Exception(f"Claude API error: {str(e)}")
