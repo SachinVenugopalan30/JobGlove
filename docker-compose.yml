@@ -30,6 +30,17 @@ services:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
       - ./backend/logs:/app/backend/logs
+
+      # Mount backend code for development (changes reflect without rebuild)
+      # Note: Mounting specific directories to avoid overriding /app/backend/static
+      - ./backend/routes:/app/backend/routes
+      - ./backend/services:/app/backend/services
+      - ./backend/utils:/app/backend/utils
+      - ./backend/database:/app/backend/database
+      - ./backend/templates:/app/backend/templates
+      - ./backend/app.py:/app/backend/app.py
+      - ./backend/wsgi.py:/app/backend/wsgi.py
+      - ./backend/config.py:/app/backend/config.py
     
     restart: unless-stopped
     

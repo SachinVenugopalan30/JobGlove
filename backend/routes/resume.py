@@ -7,7 +7,7 @@ from config import Config
 from services.document_parser import DocumentParser
 from services.ai_service import AIService
 from services.latex_generator import LaTeXGenerator
-from services.scoring_service import create_scoring_service
+from services.scoring_service import create_scoring_service, calculate_cosine_similarity, calculate_embedding_similarity, generate_ats_recommendations, ENHANCED_SCORING_AVAILABLE
 from services.review_service import create_review_service
 from database.db import get_session, Resume, ResumeVersion, Score, ReviewBullet
 from utils.logger import app_logger
@@ -107,6 +107,10 @@ def tailor_resume():
         resume_without_header = DocumentParser.remove_header(resume_text)
         app_logger.info(f"Removed header for privacy. Resume length: {len(resume_without_header)} chars")
 
+        # Calculate cosine similarity between resume and job description
+        similarity_score = calculate_cosine_similarity(resume_without_header, job_description)
+        app_logger.info(f"Cosine similarity score: {similarity_score}%")
+
         # Get appropriate API key
         api_keys = {
             'openai': Config.OPENAI_API_KEY,
@@ -122,7 +126,12 @@ def tailor_resume():
         # Score and tailor resume using AI in single request
         app_logger.info(f"Sending resume to {selected_api} API for scoring and tailoring")
         ai_provider = AIService.get_provider(selected_api, api_key)
-        ai_response = ai_provider.score_and_tailor_resume(resume_without_header, job_description, custom_prompt)
+        ai_response = ai_provider.score_and_tailor_resume(
+            resume_without_header, 
+            job_description, 
+            custom_prompt,
+            similarity_score  # Pass cosine similarity as context to LLM
+        )
 
         original_score = ai_response['original_score']
         tailored_resume = ai_response['tailored_resume']
@@ -187,6 +196,7 @@ def tailor_resume():
             'tailored_text': complete_resume,
             'original_score': original_score,
             'tailored_score': tailored_score,
+            'similarity_score': similarity_score,  # Include cosine similarity in response
             'message': 'Resume tailored successfully'
         }), 200
 
@@ -240,6 +250,60 @@ def score_resume():
 
     except Exception as e:
         app_logger.error(f"Error scoring resume: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@resume_bp.route('/ats-analysis', methods=['POST'])
+def ats_analysis():
+    """
+    Perform comprehensive ATS analysis on resume against job description.
+    Returns keyword analysis, missing keywords, recommendations, and ATS compatibility score.
+    """
+    try:
+        data = request.json
+
+        resume_text = data.get('resume_text')
+        job_description = data.get('job_description')
+
+        if not resume_text or not job_description:
+            app_logger.warning("ATS analysis request missing required fields")
+            return jsonify({'error': 'Missing required fields: resume_text and job_description'}), 400
+
+        app_logger.info("Starting ATS analysis")
+
+        # Calculate both similarity scores
+        tfidf_similarity = calculate_cosine_similarity(resume_text, job_description)
+        embedding_similarity = calculate_embedding_similarity(resume_text, job_description)
+
+        # Generate comprehensive ATS recommendations
+        ats_results = generate_ats_recommendations(
+            resume_text,
+            job_description,
+            embedding_similarity,
+            tfidf_similarity
+        )
+
+        # Build similarity components list conditionally
+        similarity_components = [tfidf_similarity]
+        if ENHANCED_SCORING_AVAILABLE:
+            similarity_components.append(embedding_similarity)
+
+        # Calculate overall match as mean of available components
+        overall_match = round(sum(similarity_components) / len(similarity_components), 2)
+
+        # Combine all scores into response
+        response = {
+            **ats_results,
+            'tfidf_similarity': tfidf_similarity,
+            'embedding_similarity': embedding_similarity,
+            'overall_match': overall_match
+        }
+
+        app_logger.info(f"ATS analysis complete. ATS Score: {response['ats_score']:.2f}, Overall Match: {response['overall_match']:.2f}%")
+        return jsonify(response), 200
+
+    except Exception as e:
+        app_logger.error(f"Error performing ATS analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 

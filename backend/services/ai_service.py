@@ -27,7 +27,7 @@ class AIProvider(ABC):
         pass
 
     @abstractmethod
-    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None, similarity_score: Optional[float] = None) -> Dict[str, Any]:
         """Score original resume, tailor it, and score the tailored version in a single request"""
         pass
 
@@ -59,14 +59,31 @@ class AIProvider(ABC):
 
 
 
-    def _create_score_and_tailor_prompt(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> str:
+    def _create_score_and_tailor_prompt(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None, similarity_score: Optional[float] = None) -> str:
         """Create prompt for scoring and tailoring in single request"""
         base_instructions = custom_prompt if custom_prompt else ""
+        
+        # Add similarity score context if provided
+        similarity_context = ""
+        if similarity_score is not None:
+            similarity_context = f"""
+[INITIAL MATCH ANALYSIS]
+TF-IDF Cosine Similarity Score: {similarity_score}%
 
-        return f"""You are an expert resume writer and analyst. 
+This score represents the keyword overlap between the resume and job description.
+- Below 30%: Significant mismatch - major tailoring needed
+- 30-50%: Moderate match - substantial improvements possible
+- 50-70%: Good match - focus on optimizing key sections
+- Above 70%: Strong match - minor refinements suggested
 
-CRITICAL INSTRUCTION: You MUST follow the exact formatting rules specified below. Pay special attention to the EXPERIENCE section format.
+Use this as context when scoring and tailoring the resume.
+"""
 
+        return f"""You are an expert resume writer and analyst.
+
+CRITICAL: Section headers MUST use square brackets and ALL CAPS.
+Examples: [EDUCATION], [TECHNICAL SKILLS], [EXPERIENCE], [PROJECTS]
+{similarity_context}
 Your task is to:
 1. Score the original resume against the job description
 2. Tailor the resume to match the job description
@@ -101,58 +118,51 @@ SCORING CRITERIA:
 - total_score: Weighted average of the above scores
 
 TAILORING REQUIREMENTS:
-Use this EXACT format for the tailored_resume text. Follow these formatting rules STRICTLY:
+Use this EXACT format for the tailored_resume text:
 
 [EDUCATION]
 School Name | Location
 Degree Title | Graduation Date
-(Repeat for each education entry)
+
+[TECHNICAL SKILLS]
+Category: Skill1, Skill2, Skill3
+CRITICAL: Copy the EXACT skills from the original resume - do NOT modify.
 
 [EXPERIENCE]
-CRITICAL: Each job entry MUST follow this EXACT 2-line format:
-Line 1: Company Name | Location
-Line 2: Job Title | Start Date - End Date
-Then bullet points starting with "-"
+CRITICAL: Each job entry MUST follow this 2-line format:
+Job Title | Start Date - End Date
+Company Name | Location
+- Bullet points starting with "-"
+
+BULLET POINT REQUIREMENTS:
+- Each job entry MUST have 3-5 bullet points (minimum 3, maximum 5)
+- If original resume has more than 5 points, condense the most impactful achievements into 5 points
+- If original resume has fewer than 3 points, expand with relevant details
 
 CORRECT Example:
-Company Name | Location, Country
-Role | Month 2023 - Month 2025
+Senior Data Scientist | October 2023 - April 2025
+Comapny Name | City, Country
 - Enhanced operational efficiency by 14% through predictive model deployment
-- Reduced costs by 10% using Random Forest and Clustering algorithms
+- Reduced costs by 10% using Random Forest algorithms
+- Led team of 3 data scientists
 
-WRONG Example (DO NOT DO THIS):
-Role | Company | Location, Country | Month 2023 - Month 2025
+WRONG: Company first, or single line with 4 parts.
 
-WRONG Example (DO NOT DO THIS):
-Role | Company | Location, Country
-Month 2023 - Month 2025
-
-DO NOT put all information on one line with 4 pipe separators.
-DO NOT put the date on a separate third line.
-ALWAYS use exactly 2 lines: "Company | Location" then "Title | Date".
-
-(Repeat for each job)
-
-[SKILLS]
-Category Name: skill1, skill2, skill3, skill4
-Category Name: skill1, skill2, skill3, skill4
-(Use categories like: Programming Languages, Frameworks, Tools, etc.)
-
-[PROJECTS] (if applicable)
+[PROJECTS]
 Project Name | Tech Stack
 Date Range
-- Bullet point describing the project
-- Bullet point describing the project
-(Repeat for each project)
+- Bullet points (2-4 points per project)
 
 REQUIREMENTS:
-1. Emphasize skills and experiences most relevant to the job description
-2. All bullet points should follow the "Accomplished X through Y using Z" template
-3. Keep original achievements but reframe them to align with the target role
-4. Use action verbs and quantify achievements where possible. Try and not repeat the same action verbs as much as possible.
-5. Use plain text only - DO NOT escape special characters (%, &, $, #, etc.)
-6. Maintain professional tone and consistency in tense
-{f"7. {base_instructions}" if base_instructions else ""}
+1. PRESERVE SKILLS section exactly as in original resume
+2. For EXPERIENCE/PROJECTS: Reframe to align with job description
+3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)
+4. Each PROJECT entry should have 2-4 bullet points
+5. Use "Accomplished X through Y using Z" template for bullets
+6. Use action verbs and quantify achievements (avoid repeating verbs)
+7. Use plain text - DO NOT escape special characters (%, &, $, #)
+8. Maintain professional tone and consistent tense
+{f"9. {base_instructions}" if base_instructions else ""}
 
 Original Resume:
 {resume_text}
@@ -207,45 +217,37 @@ RESPONSE FORMAT:
                 job_description=job_description
             )
 
-        return f"""You are an expert resume writer. Tailor the following resume to match the job description provided.
-
-Analyze the job description and rewrite the resume to emphasize relevant skills and experiences. Use the following structured format:
+        return f"""You are an expert resume writer. Tailor the resume to match the job description.
 
 FORMAT YOUR RESPONSE EXACTLY AS FOLLOWS:
 
 [EDUCATION]
 School Name | Location
 Degree Title | Graduation Date
-(Repeat for each education entry)
 
 [EXPERIENCE]
-Company Name | Location
 Job Title | Start Date - End Date
-- Bullet point describing achievement/responsibility
-- Bullet point describing achievement/responsibility
-- Bullet point describing achievement/responsibility
-(Repeat for each job)
+Company Name | Location
+- Bullet points (3-5 points per job entry)
 
-[SKILLS]
-Category Name: skill1, skill2, skill3, skill4
-Category Name: skill1, skill2, skill3, skill4
-(Use categories like: Programming Languages, Frameworks, Tools, etc.)
+[TECHNICAL SKILLS]
+Category: Skill1, Skill2, Skill3
+CRITICAL: Copy EXACT skills from original resume - do NOT modify.
 
-[PROJECTS] (if applicable)
+[PROJECTS]
 Project Name | Tech Stack
 Date Range
-- Bullet point describing the project
-- Bullet point describing the project
-(Repeat for each project)
+- Bullet points (2-4 points per project)
 
 REQUIREMENTS:
-1. Emphasize skills and experiences most relevant to the job description
-2. Ensure that all bullet points follow the Accomplished X through Y using Z template
-3. Keep original achievements but reframe them to align with the target role
-4. Maintain professional tone and quantify achievements where possible, but do not create your own metrics and achievements
-5. Use action verbs and specific metrics
-6. Ensure consistency in tense (past tense for previous roles, present for current)
-7. Use plain text only - DO NOT escape special characters like %, &, $, #, etc. The system will handle escaping automatically
+1. PRESERVE SKILLS section exactly as in original
+2. For EXPERIENCE/PROJECTS: Reframe to align with job description
+3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more than 5)
+4. Each PROJECT entry should have 2-4 bullet points
+5. Use "Accomplished X through Y using Z" template
+6. Use action verbs and quantify achievements
+7. Maintain consistency in tense
+8. Use plain text - DO NOT escape special characters (%, &, $, #)
 
 Original Resume:
 {resume_text}
@@ -253,10 +255,7 @@ Original Resume:
 Job Description:
 {job_description}
 
-CRITICAL: Output ONLY the structured resume content following the exact format above.
-- Do NOT include explanations, comments, or markdown formatting
-- Do NOT escape special characters (no backslashes, no LaTeX commands)
-- Use plain text with normal symbols: %, &, $, #, etc."""
+Output ONLY structured resume content in the format above."""
 
 
 class OpenAIProvider(AIProvider):
@@ -265,10 +264,10 @@ class OpenAIProvider(AIProvider):
         self.model = Config.OPENAI_MODEL
         app_logger.info(f"OpenAI provider initialized with model: {self.model}")
 
-    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None, similarity_score: Optional[float] = None) -> Dict[str, Any]:
         try:
             app_logger.info(f"Calling OpenAI API for score and tailor ({self.model})")
-            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
+            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt, similarity_score)
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -333,10 +332,10 @@ class GeminiProvider(AIProvider):
             generation_config={"response_mime_type": "application/json"})
         app_logger.info(f"Gemini provider initialized with model: {self.model_name}")
 
-    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None, similarity_score: Optional[float] = None) -> Dict[str, Any]:
         try:
             app_logger.info(f"Calling Gemini API for score and tailor ({self.model_name})")
-            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
+            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt, similarity_score)
             response = self.model.generate_content(prompt)
             content = response.text
             app_logger.info("Gemini API call successful")
@@ -397,10 +396,10 @@ class ClaudeProvider(AIProvider):
                 f"Available keys: {available_keys}"
             )
 
-    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def score_and_tailor_resume(self, resume_text: str, job_description: str, custom_prompt: Optional[str] = None, similarity_score: Optional[float] = None) -> Dict[str, Any]:
         try:
             app_logger.info(f"Calling Claude API for score and tailor ({self.model})")
-            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt)
+            prompt = self._create_score_and_tailor_prompt(resume_text, job_description, custom_prompt, similarity_score)
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4000,

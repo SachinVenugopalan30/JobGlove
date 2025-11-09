@@ -38,22 +38,35 @@ class LaTeXGenerator:
     def bold_metrics(text: str) -> str:
         """Bold numbers and metrics in text using \\textbf{}, then escape LaTeX"""
         # Pattern to match various numeric formats
-        # Order matters: more specific patterns first
-        # Use negative lookbehind to avoid re-matching already bolded content
-        patterns = [
-            (r'(\d+(?:\.\d+)?%)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Percentages: 50%, 12.5%
-            (r'(\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Currency: $1,000, $50.00
-            (r'(?<!\$)(\d{1,3}(?:,\d{3})+)(?![\d.])', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Large numbers: 1,000 (not after $)
-            (r'(\d+-\d+)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Ranges: 10-20, 2021-2023
-            (r'\b(\d+(?:\.\d+)?[KMB])\b', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Abbreviated: 5K, 2.5M
-            (r'\b(\d+(?:\.\d+)?)\s*(million|billion|thousand)', r'<<<BOLD_START>>>\1<<<BOLD_END>>> \2'),
-            (r'(\d+x)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Multipliers: 2x, 10x
-            (r'(?<!-)(\d{4})(?!-)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),  # Years: 2023 (not in ranges)
-        ]
-
+        # Order matters: more specific patterns first to avoid conflicts
+        
         result = text
+        
+        # Apply patterns one by one to avoid overlapping matches
+        patterns = [
+            # Percentages: 50%, 12.5%
+            (r'(\d+(?:\.\d+)?%)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Currency with abbreviations: $2.5M, $1.2B, $500K (MUST come before plain currency)
+            (r'(\$\d+(?:\.\d+)?[KMB])\b', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Currency with commas or decimals: $1,000, $50.00, $1,234,567, $2.50
+            # But NOT if already inside bold markers or followed by K/M/B
+            (r'(?<!START>>>)(\$\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?![KMB])(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Large numbers with commas (not currency, not already bolded): 1,000, 10,000
+            (r'(?<!\$)(?<!START>>>)(\d{1,3}(?:,\d{3})+)(?![\d.])(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Abbreviated numbers: 5K, 2.5M, 1.2B (but not if part of currency or already bolded)
+            (r'(?<!\$)(?<!START>>>)\b(\d+(?:\.\d+)?[KMB])\b(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Number + word: "5 million", "2.5 billion"
+            (r'(?<!START>>>)\b(\d+(?:\.\d+)?)\s*(million|billion|thousand)(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>> \2'),
+            # Multipliers: 2x, 10x
+            (r'(?<!START>>>)(\d+x)(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Ranges (but NOT dates like 2021-2023, so only for small numbers)
+            # Only match ranges like 10-20, 5-8, not 2021-2023
+            (r'(?<!START>>>)\b([1-9]\d{0,2}-[1-9]\d{0,2})\b(?!<<<BOLD_END>>>)', r'<<<BOLD_START>>>\1<<<BOLD_END>>>'),
+            # Note: Years in dates (like "Oct 2025", "in 2023") should NOT be bolded
+            # Removed standalone year pattern to avoid bolding years in dates
+        ]
+        
         for pattern, replacement in patterns:
-            # Skip if already inside bold markers
             result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
 
         return result
@@ -80,6 +93,53 @@ class LaTeXGenerator:
         return text
 
     @staticmethod
+    def _normalize_section_headers(resume_text: str) -> str:
+        """
+        Normalize section headers by adding square brackets if missing.
+        Some AI providers (especially Gemini) sometimes return headers without brackets.
+
+        Args:
+            resume_text: Resume text that may have malformed section headers
+
+        Returns:
+            Resume text with normalized section headers
+        """
+        common_sections = [
+            'HEADER', 'EDUCATION', 'EXPERIENCE', 'TECHNICAL SKILLS', 'SKILLS',
+            'PROJECTS', 'CERTIFICATIONS', 'PUBLICATIONS', 'AWARDS'
+        ]
+
+        lines = resume_text.split('\n')
+        normalized_lines = []
+        max_blank_lines_to_skip = 3
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Check if line matches a common section name (case-insensitive, no brackets)
+            # and is likely a header (short line, all caps or title case, followed by content)
+            for section in common_sections:
+                # Match exact section name without brackets
+                if stripped.upper() == section and not stripped.startswith('['):
+                    # Verify this looks like a header by checking for non-empty content
+                    # within the next few lines (skip over blank lines)
+                    has_content_following = False
+                    for j in range(1, min(max_blank_lines_to_skip + 1, len(lines) - i)):
+                        if lines[i + j].strip():
+                            has_content_following = True
+                            break
+
+                    if has_content_following:
+                        app_logger.info(f"Normalizing section header: '{stripped}' -> '[{section}]'")
+                        normalized_lines.append(f'[{section}]')
+                        break
+            else:
+                # No section match, keep original line
+                normalized_lines.append(line)
+
+        return '\n'.join(normalized_lines)
+
+    @staticmethod
     def parse_structured_resume(resume_text: str) -> str:
         """
         Parse structured resume text and convert to LaTeX format.
@@ -90,36 +150,60 @@ class LaTeXGenerator:
         Returns:
             LaTeX formatted resume content
         """
-        latex_parts = []
+        app_logger.debug(f"Raw resume text to parse (first 500 chars): {resume_text[:500]}")
+
+        # Normalize section headers (add brackets if missing)
+        resume_text = LaTeXGenerator._normalize_section_headers(resume_text)
 
         # Split into sections (handle sections at start of string or after newline)
-        sections = re.split(r'(?:^|\n)\[([A-Z]+)\]\n', resume_text, flags=re.MULTILINE)
+        # Updated regex to handle multi-word sections like "TECHNICAL SKILLS"
+        sections = re.split(r'(?:^|\n)\[([A-Z\s]+)\]\n', resume_text, flags=re.MULTILINE)
 
+        # Parse all sections into a dictionary
+        section_dict = {}
         current_section = None
         for i, part in enumerate(sections):
             if i == 0:
                 continue
 
             if i % 2 == 1:
-                current_section = part
+                current_section = part.strip()  # Strip whitespace from section name
             else:
                 content = part.strip()
-                section_latex = ""
+                section_dict[current_section] = content
 
-                if current_section == 'HEADER':
-                    section_latex = LaTeXGenerator._format_header(content)
-                elif current_section == 'EDUCATION':
-                    section_latex = LaTeXGenerator._format_education(content)
-                elif current_section == 'TECHNICAL SKILLS':
-                    section_latex = LaTeXGenerator._format_skills(content)
-                elif current_section == 'EXPERIENCE':
-                    section_latex = LaTeXGenerator._format_experience(content)
-                elif current_section == 'PROJECTS':
-                    section_latex = LaTeXGenerator._format_projects(content)
+        # Enforce fixed section order: HEADER -> EDUCATION -> TECHNICAL SKILLS -> EXPERIENCE -> PROJECTS
+        # This ensures consistent ordering regardless of AI output
+        ordered_sections = [
+            ('HEADER', LaTeXGenerator._format_header),
+            ('EDUCATION', LaTeXGenerator._format_education),
+            ('TECHNICAL SKILLS', LaTeXGenerator._format_skills),
+            ('SKILLS', LaTeXGenerator._format_skills),  # Fallback for SKILLS
+            ('EXPERIENCE', LaTeXGenerator._format_experience),
+            ('PROJECTS', LaTeXGenerator._format_projects),
+        ]
+
+        # Log what sections we received for debugging
+        app_logger.info(f"Received sections from AI: {list(section_dict.keys())}")
+
+        latex_parts = []
+        skills_added = False  # Track if we've already added skills section
+        for section_name, format_func in ordered_sections:
+            if section_name in section_dict:
+                content = section_dict[section_name]
+                section_latex = format_func(content)
                 
                 # Only add non-empty sections
                 if section_latex:
+                    # Skip SKILLS if we already added TECHNICAL SKILLS (or vice versa)
+                    if section_name in ['SKILLS', 'TECHNICAL SKILLS']:
+                        if skills_added:
+                            app_logger.info(f"Skipping duplicate skills section: {section_name}")
+                            continue
+                        skills_added = True
+                    
                     latex_parts.append(section_latex)
+                    app_logger.info(f"Added section: {section_name}")
 
         return '\n\n'.join(latex_parts)
 
@@ -199,7 +283,7 @@ class LaTeXGenerator:
                             location_esc = LaTeXGenerator.escape_latex(location)
                             degree_esc = LaTeXGenerator.escape_latex(degree)
                             date_esc = LaTeXGenerator.escape_latex(date)
-                            latex += f"    \\resumeSubheading\n      {{{school_esc}}}{{{location_esc}}}\n      {{{degree_esc}}}{{{date_esc}}}\n"
+                            latex += f" \\resumeSubheading\n      {{{school_esc}}}{{{location_esc}}}\n      {{{degree_esc}}} {{{date_esc}}}\n"
                             i += 2
                             continue
             i += 1
@@ -211,13 +295,18 @@ class LaTeXGenerator:
     def _format_experience(content: str) -> str:
         """Format experience section - skip if empty
         
-        Handles two formats:
-        Format 1 (preferred - from prompt):
+        Handles three formats:
+        Format 1 (NEW - correct order from prompt):
+            Job Title | Start Date - End Date
+            Company Name | Location
+            - Bullet points
+        
+        Format 2 (OLD - backwards compatibility):
             Company Name | Location
             Job Title | Start Date - End Date
             - Bullet points
         
-        Format 2 (AI sometimes returns):
+        Format 3 (AI sometimes returns single line):
             Job Title | Company Name | Location | Date
             - Bullet points
         """
@@ -235,23 +324,24 @@ class LaTeXGenerator:
             app_logger.info("Experience section is empty, skipping")
             return ""
         
-        latex = "\\section{Experience}\n  \\resumeSubHeadingListStart\n\n"
+        latex = "\\section{Experience}\n  \\resumeSubHeadingListStart\n"
 
         i = 0
         while i < len(lines):
             if '|' in lines[i] and not lines[i].startswith('-'):
                 parts = [p.strip() for p in lines[i].split('|')]
                 
-                # Format 2: Single line with 4 parts (Title | Company | Location | Date)
+                # Format 3: Single line with 4 parts (Title | Company | Location | Date)
                 if len(parts) == 4:
                     title, company, location, date = parts
                     
-                    company_esc = LaTeXGenerator.escape_latex(company)
-                    location_esc = LaTeXGenerator.escape_latex(location)
                     title_esc = LaTeXGenerator.escape_latex(title)
                     date_esc = LaTeXGenerator.escape_latex(date)
+                    company_esc = LaTeXGenerator.escape_latex(company)
+                    location_esc = LaTeXGenerator.escape_latex(location)
                     
-                    latex += f"    \\resumeSubheading\n      {{{company_esc}}}{{{location_esc}}}\n      {{{title_esc}}}{{{date_esc}}}\n"
+                    # Correct order: Title, Date, Company, Location
+                    latex += f"\n    \\resumeSubheading\n      {{{title_esc}}}{{{date_esc}}}\n      {{{company_esc}}}{{{location_esc}}}\n"
                     latex += "      \\resumeItemListStart\n"
                     
                     i += 1
@@ -262,24 +352,43 @@ class LaTeXGenerator:
                         latex += f"        \\resumeItem{{{bullet_esc}}}\n"
                         i += 1
                     
-                    latex += "      \\resumeItemListEnd\n\n"
+                    latex += "      \\resumeItemListEnd\n"
                     continue
                     
-                # Format 1: Two lines (Company | Location, then Title | Date)
+                # Format 1 or 2: Two lines, need to detect which order
                 elif len(parts) == 2:
-                    company, location = parts
+                    first_part1, first_part2 = parts
 
                     if i + 1 < len(lines) and '|' in lines[i + 1] and not lines[i + 1].startswith('-'):
-                        title_parts = [p.strip() for p in lines[i + 1].split('|')]
-                        if len(title_parts) == 2:
-                            title, date = title_parts
+                        second_parts = [p.strip() for p in lines[i + 1].split('|')]
+                        if len(second_parts) == 2:
+                            second_part1, second_part2 = second_parts
+                            
+                            # Detect format: check if first line looks like a date (contains year or month-year pattern)
+                            # If first line second part contains digits suggesting a year/date, it's Title | Date (Format 1)
+                            # Otherwise it's Company | Location (Format 2)
+                            date_pattern = r'\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Present|Current)'
+                            
+                            if re.search(date_pattern, first_part2, re.IGNORECASE):
+                                # Format 1: Title | Date, then Company | Location
+                                title = first_part1
+                                date = first_part2
+                                company = second_part1
+                                location = second_part2
+                            else:
+                                # Format 2: Company | Location, then Title | Date
+                                company = first_part1
+                                location = first_part2
+                                title = second_part1
+                                date = second_part2
 
-                            company_esc = LaTeXGenerator.escape_latex(company)
-                            location_esc = LaTeXGenerator.escape_latex(location)
                             title_esc = LaTeXGenerator.escape_latex(title)
                             date_esc = LaTeXGenerator.escape_latex(date)
+                            company_esc = LaTeXGenerator.escape_latex(company)
+                            location_esc = LaTeXGenerator.escape_latex(location)
 
-                            latex += f"    \\resumeSubheading\n      {{{company_esc}}}{{{location_esc}}}\n      {{{title_esc}}}{{{date_esc}}}\n"
+                            # Correct order: Title, Date, Company, Location
+                            latex += f"\n    \\resumeSubheading\n      {{{title_esc}}}{{{date_esc}}}\n      {{{company_esc}}}{{{location_esc}}}\n"
                             latex += "      \\resumeItemListStart\n"
 
                             i += 2
@@ -290,7 +399,7 @@ class LaTeXGenerator:
                                 latex += f"        \\resumeItem{{{bullet_esc}}}\n"
                                 i += 1
 
-                            latex += "      \\resumeItemListEnd\n\n"
+                            latex += "      \\resumeItemListEnd\n"
                             continue
             i += 1
 
@@ -306,7 +415,8 @@ class LaTeXGenerator:
         if not lines:
             return ""
         
-        latex = "\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n"
+        # Use regular string concatenation to avoid f-string brace issues
+        latex = "\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n"
 
         for line in lines:
             if ':' in line:
@@ -317,9 +427,9 @@ class LaTeXGenerator:
                 category_esc = LaTeXGenerator.escape_latex(category)
                 skills_esc = LaTeXGenerator.escape_latex(skills)
 
-                latex += f"    \\small{{\\item{{\n     \\textbf{{{category_esc}}}{{: {skills_esc}}} \\\\\n    }}}}"
+                latex += f"    \\textbf{{{category_esc}}}{{: {skills_esc}}} \\\\\n"
 
-        latex += " \\end{itemize}"
+        latex += "    }}\n \\end{itemize}"
         return latex
 
     @staticmethod
@@ -354,7 +464,7 @@ class LaTeXGenerator:
                         tech_esc = LaTeXGenerator.escape_latex(tech_stack)
                         date_esc = LaTeXGenerator.escape_latex(date_range)
 
-                        latex += f"      \\resumeProjectHeading\n          {{\\textbf{{{project_esc}}} $|$ \\emph{{{tech_esc}}}}}{{{date_esc}}}\n"
+                        latex += f"    \\resumeProjectHeading\n          {{\\textbf{{{project_esc}}} $|$ \\emph{{{tech_esc}}}}}{{{date_esc}}}\n"
                         latex += "          \\resumeItemListStart\n"
 
                         i += 2

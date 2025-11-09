@@ -8,8 +8,11 @@ from config import Config
 from utils.logger import app_logger
 from database.db import init_db
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+app = Flask(__name__, static_folder=None)
 CORS(app)
+
+# Set static folder path manually (don't use Flask's built-in static serving)
+STATIC_FOLDER = os.path.join(os.path.dirname(__file__), 'static')
 
 # Configure Flask
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_FILE_SIZE
@@ -23,11 +26,18 @@ app.register_blueprint(resume_bp, url_prefix='/api')
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    """Serve frontend static files"""
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    else:
-        return send_from_directory(app.static_folder, 'index.html')
+    """Serve frontend static files for SPA routing"""
+    # Don't intercept API routes
+    if path.startswith('api/'):
+        return {'error': 'Endpoint not found'}, 404
+
+    # If path points to an actual file, serve it
+    file_path = os.path.join(STATIC_FOLDER, path)
+    if path != "" and os.path.exists(file_path):
+        return send_from_directory(STATIC_FOLDER, path)
+
+    # For all other routes (including /tailor), serve index.html for SPA routing
+    return send_from_directory(STATIC_FOLDER, 'index.html')
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
