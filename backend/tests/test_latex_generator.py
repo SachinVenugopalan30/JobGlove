@@ -62,12 +62,15 @@ class TestLaTeXGenerator:
         assert '<<<BOLD_START>>>1,000,000<<<BOLD_END>>>' in result
 
     def test_bold_metrics_ranges(self):
-        """Test bolding number ranges"""
+        """Test bolding number ranges (but NOT year ranges like 2021-2023)"""
         text = "Managed team of 5-10 people from 2021-2023"
         result = LaTeXGenerator.bold_metrics(text)
 
+        # Small number ranges should be bolded
         assert '<<<BOLD_START>>>5-10<<<BOLD_END>>>' in result
-        assert '<<<BOLD_START>>>2021-2023<<<BOLD_END>>>' in result
+        # Year ranges should NOT be bolded (to avoid bolding dates)
+        assert '<<<BOLD_START>>>2021-2023<<<BOLD_END>>>' not in result
+        assert '2021-2023' in result  # But the text should still be there
 
     def test_bold_metrics_abbreviated(self):
         """Test bolding abbreviated numbers"""
@@ -87,12 +90,36 @@ class TestLaTeXGenerator:
         assert '<<<BOLD_START>>>10x<<<BOLD_END>>>' in result
 
     def test_bold_metrics_years(self):
-        """Test bolding years"""
-        text = "Started in 2020, graduated in 2023"
+        """Test that years in dates are NOT bolded (to avoid bolding dates like 'Oct 2025')"""
+        text = "Won award in Oct 2023, started in 2020, graduated in 2023"
         result = LaTeXGenerator.bold_metrics(text)
 
-        assert '<<<BOLD_START>>>2020<<<BOLD_END>>>' in result
-        assert '<<<BOLD_START>>>2023<<<BOLD_END>>>' in result
+        # Years should NOT be bolded standalone anymore to avoid bolding dates
+        assert '<<<BOLD_START>>>2020<<<BOLD_END>>>' not in result
+        assert '<<<BOLD_START>>>2023<<<BOLD_END>>>' not in result
+        
+        # The text should remain unchanged (no bolding)
+        assert '2020' in result
+        assert '2023' in result
+    
+    def test_bold_metrics_does_not_bold_dates(self):
+        """Test that dates are not bolded"""
+        test_cases = [
+            "Won Employee of the Year award in Oct 2025",
+            "Published paper in January 2024",
+            "Graduated in May 2023",
+            "Started project in 2022",
+            "Completed certification in Dec 2021"
+        ]
+        
+        for text in test_cases:
+            result = LaTeXGenerator.bold_metrics(text)
+            # No years should be bolded
+            assert '<<<BOLD_START>>>2025<<<BOLD_END>>>' not in result
+            assert '<<<BOLD_START>>>2024<<<BOLD_END>>>' not in result
+            assert '<<<BOLD_START>>>2023<<<BOLD_END>>>' not in result
+            assert '<<<BOLD_START>>>2022<<<BOLD_END>>>' not in result
+            assert '<<<BOLD_START>>>2021<<<BOLD_END>>>' not in result
 
     def test_finalize_bold_and_escape(self):
         """Test combining bolding and escaping"""
