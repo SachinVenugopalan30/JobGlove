@@ -232,23 +232,25 @@ class ATSRecommendationEngine:
         resume_text: str
     ) -> List[Tuple[str, float]]:
         """Find important keywords from JD that are missing or underrepresented in resume"""
-        resume_text_lower = resume_text.lower()
         resume_keyword_set = {kw.lower() for kw, _ in resume_keywords}
-        
+
         missing = []
         for keyword, score in jd_keywords:
-            keyword_lower = keyword.lower()
-            
+            # Create boundary-aware regex pattern
+            escaped_keyword = re.escape(keyword)
+            pattern = re.compile(r'\b' + escaped_keyword + r'\b', re.IGNORECASE)
+
             # Check if keyword appears in resume
-            if keyword_lower not in resume_text_lower:
+            if not pattern.search(resume_text):
                 missing.append((keyword, score))
             # Check if it's underrepresented (mentioned but not emphasized)
-            elif keyword_lower not in resume_keyword_set:
-                # Count occurrences
-                count = resume_text_lower.count(keyword_lower)
+            elif keyword.lower() not in resume_keyword_set:
+                # Count occurrences with boundary-aware matching
+                matches = pattern.findall(resume_text)
+                count = len(matches)
                 if count < 2:  # Appears less than twice
                     missing.append((keyword, score * 0.7))  # Lower priority
-        
+
         # Sort by score (importance)
         missing = sorted(missing, key=lambda x: x[1], reverse=True)
         return missing
@@ -259,16 +261,20 @@ class ATSRecommendationEngine:
         resume_text: str
     ) -> List[Tuple[str, int]]:
         """Find JD keywords that are present in resume with their frequency"""
-        resume_text_lower = resume_text.lower()
         present = []
-        
-        for keyword, score in jd_keywords:
-            keyword_lower = keyword.lower()
-            count = resume_text_lower.count(keyword_lower)
-            
+
+        for keyword, _score in jd_keywords:
+            # Create boundary-aware regex pattern
+            escaped_keyword = re.escape(keyword)
+            pattern = re.compile(r'\b' + escaped_keyword + r'\b', re.IGNORECASE)
+
+            # Count occurrences with boundary-aware matching
+            matches = pattern.findall(resume_text)
+            count = len(matches)
+
             if count > 0:
                 present.append((keyword, count))
-        
+
         # Sort by frequency
         present = sorted(present, key=lambda x: x[1], reverse=True)
         return present

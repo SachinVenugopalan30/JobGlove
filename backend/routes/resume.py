@@ -7,7 +7,7 @@ from config import Config
 from services.document_parser import DocumentParser
 from services.ai_service import AIService
 from services.latex_generator import LaTeXGenerator
-from services.scoring_service import create_scoring_service, calculate_cosine_similarity, calculate_embedding_similarity, generate_ats_recommendations
+from services.scoring_service import create_scoring_service, calculate_cosine_similarity, calculate_embedding_similarity, generate_ats_recommendations, ENHANCED_SCORING_AVAILABLE
 from services.review_service import create_review_service
 from database.db import get_session, Resume, ResumeVersion, Score, ReviewBullet
 from utils.logger import app_logger
@@ -283,12 +283,20 @@ def ats_analysis():
             tfidf_similarity
         )
 
+        # Build similarity components list conditionally
+        similarity_components = [tfidf_similarity]
+        if ENHANCED_SCORING_AVAILABLE:
+            similarity_components.append(embedding_similarity)
+
+        # Calculate overall match as mean of available components
+        overall_match = round(sum(similarity_components) / len(similarity_components), 2)
+
         # Combine all scores into response
         response = {
             **ats_results,
             'tfidf_similarity': tfidf_similarity,
             'embedding_similarity': embedding_similarity,
-            'overall_match': round((tfidf_similarity + embedding_similarity) / 2, 2)
+            'overall_match': overall_match
         }
 
         app_logger.info(f"ATS analysis complete. ATS Score: {response['ats_score']:.2f}, Overall Match: {response['overall_match']:.2f}%")

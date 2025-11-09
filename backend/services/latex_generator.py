@@ -105,12 +105,13 @@ class LaTeXGenerator:
             Resume text with normalized section headers
         """
         common_sections = [
-            'EDUCATION', 'EXPERIENCE', 'TECHNICAL SKILLS', 'SKILLS',
+            'HEADER', 'EDUCATION', 'EXPERIENCE', 'TECHNICAL SKILLS', 'SKILLS',
             'PROJECTS', 'CERTIFICATIONS', 'PUBLICATIONS', 'AWARDS'
         ]
 
         lines = resume_text.split('\n')
         normalized_lines = []
+        max_blank_lines_to_skip = 3
 
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -120,8 +121,15 @@ class LaTeXGenerator:
             for section in common_sections:
                 # Match exact section name without brackets
                 if stripped.upper() == section and not stripped.startswith('['):
-                    # Verify this looks like a header by checking next line has content
-                    if i + 1 < len(lines) and lines[i + 1].strip():
+                    # Verify this looks like a header by checking for non-empty content
+                    # within the next few lines (skip over blank lines)
+                    has_content_following = False
+                    for j in range(1, min(max_blank_lines_to_skip + 1, len(lines) - i)):
+                        if lines[i + j].strip():
+                            has_content_following = True
+                            break
+
+                    if has_content_following:
                         app_logger.info(f"Normalizing section header: '{stripped}' -> '[{section}]'")
                         normalized_lines.append(f'[{section}]')
                         break

@@ -7,12 +7,15 @@ from utils.logger import app_logger
 
 # Import new modules (optional dependencies)
 try:
-    from services.embedding_manager import get_embedding_manager
-    from services.ats_recommendations import ATSRecommendationEngine
-    ENHANCED_SCORING_AVAILABLE = True
-except ImportError as e:
+    from services import embedding_manager
+    if embedding_manager.SENTENCE_TRANSFORMERS_AVAILABLE:
+        from services.embedding_manager import get_embedding_manager
+        from services.ats_recommendations import ATSRecommendationEngine
+        ENHANCED_SCORING_AVAILABLE = True
+    else:
+        ENHANCED_SCORING_AVAILABLE = False
+except ImportError:
     ENHANCED_SCORING_AVAILABLE = False
-    app_logger.warning(f"Enhanced scoring modules not available: {e}")
 
 
 def calculate_cosine_similarity(resume_text: str, job_description: str) -> float:

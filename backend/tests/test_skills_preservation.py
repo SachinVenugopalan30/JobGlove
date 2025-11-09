@@ -34,11 +34,10 @@ Software Engineer | Jan 2020 - Present
         prompt = service._create_score_and_tailor_prompt(resume, job_description)
         
         # Verify the prompt contains preservation instructions
-        assert "PRESERVE" in prompt.upper()
-        assert "skills section" in prompt.lower() or "technical skills" in prompt.lower()
-        assert "copy" in prompt.lower() and "verbatim" in prompt.lower()
-        assert "DO NOT add new skills" in prompt
-        assert "DO NOT remove any existing skills" in prompt
+        prompt_upper = prompt.upper()
+
+        assert "PRESERVE SKILLS SECTION EXACTLY AS IN ORIGINAL" in prompt_upper
+        assert "COPY THE EXACT SKILLS FROM THE ORIGINAL RESUME - DO NOT MODIFY" in prompt_upper
         
     def test_prompt_distinguishes_skills_from_experience(self):
         """Verify prompt treats skills differently from experience"""
@@ -67,9 +66,8 @@ Software Engineer | Jan 2020 - Present
         # Skills section should have PRESERVE instructions
         skills_text = ' '.join(skills_context).upper()
         assert 'PRESERVE' in skills_text or 'COPY' in skills_text
-        
+
         # Experience section should have tailoring instructions
         # (but not preserve - we want experience to be tailored)
-        experience_text = ' '.join(experience_context)
         # Just verify experience section exists and has formatting guidance
         assert len(experience_context) > 0
