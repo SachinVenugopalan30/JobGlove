@@ -20,10 +20,14 @@ class InsufficientCreditsError(Exception):
     pass
 
 
-class IncompleteClaudeResponseError(Exception):
-    """Raised when Claude API returns a response missing required fields"""
+class IncompleteResponseError(Exception):
+    """Raised when any AI provider returns a response missing required fields"""
 
     pass
+
+
+# Backward-compatible alias
+IncompleteClaudeResponseError = IncompleteResponseError
 
 
 # Patterns that indicate billing/credit issues across providers
@@ -234,11 +238,13 @@ REQUIREMENTS:
 3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)
 4. Each PROJECT entry should have 2-4 bullet points
 5. DO NOT over-exaggerate achievements.
-5. Use "Accomplished X through Y using Z" template for bullets
-6. Use action verbs and quantify achievements (avoid repeating verbs)
-7. Use plain text - DO NOT escape special characters (%, &, $, #)
-8. Maintain professional tone and consistent tense
-{f"9. {base_instructions}" if base_instructions else ""}
+6. Use "Accomplished X through Y using Z" template for bullets
+7. Use action verbs and quantify achievements (avoid repeating verbs)
+8. Use plain text - DO NOT escape special characters (%, &, $, #)
+9. Maintain professional tone and consistent tense
+10. SECTION ORDER: Output sections in this exact order: EDUCATION, TECHNICAL SKILLS, EXPERIENCE, PROJECTS
+11. Do NOT add sections that do not exist in the original resume
+{f"12. {base_instructions}" if base_instructions else ""}
 
 Original Resume:
 {resume_text}
@@ -319,6 +325,17 @@ RESPONSE FORMAT:
             del parsed["tailored_resume_lines"]
 
         return parsed
+
+    def _validate_score_response(self, parsed_response: dict[str, Any]) -> None:
+        """Validate that score_and_tailor_resume response contains all required fields."""
+        required_keys = ["original_score", "tailored_resume", "tailored_score"]
+        missing_keys = [key for key in required_keys if key not in parsed_response]
+        if missing_keys:
+            available_keys = list(parsed_response.keys())
+            app_logger.error(f"Missing required keys in response: {missing_keys}")
+            raise IncompleteResponseError(
+                f"AI returned incomplete response. Missing: {missing_keys}. Got: {available_keys}"
+            )
 
     def _create_prompt(
         self, resume_text: str, job_description: str, custom_prompt: str | None = None
@@ -401,8 +418,10 @@ class OpenAIProvider(AIProvider):
             )
             content = response.choices[0].message.content or ""
             app_logger.info("OpenAI API call successful")
-            return self._parse_json_response(content)
-        except InsufficientCreditsError:
+            parsed = self._parse_json_response(content)
+            self._validate_score_response(parsed)
+            return parsed
+        except (IncompleteResponseError, InsufficientCreditsError):
             raise
         except Exception as e:
             app_logger.error(f"OpenAI API error: {str(e)}")
@@ -483,8 +502,10 @@ class GeminiProvider(AIProvider):
             )
             content = response.text
             app_logger.info("Gemini API call successful")
-            return self._parse_json_response(content)
-        except InsufficientCreditsError:
+            parsed = self._parse_json_response(content)
+            self._validate_score_response(parsed)
+            return parsed
+        except (IncompleteResponseError, InsufficientCreditsError):
             raise
         except Exception as e:
             app_logger.error(f"Gemini API error: {str(e)}")
@@ -535,28 +556,6 @@ class ClaudeProvider(AIProvider):
         self.model = Config.CLAUDE_MODEL
         app_logger.info(f"Claude provider initialized with model: {self.model}")
 
-    def _validate_score_response(self, parsed_response: dict[str, Any]) -> None:
-        """
-        Validate that Claude's score_and_tailor_resume response contains all required fields.
-
-        Args:
-            parsed_response: The parsed JSON response from Claude API
-
-        Raises:
-            IncompleteClaudeResponseError: If any required keys are missing
-        """
-        required_keys = ["original_score", "tailored_resume", "tailored_score"]
-        missing_keys = [key for key in required_keys if key not in parsed_response]
-
-        if missing_keys:
-            available_keys = list(parsed_response.keys())
-            app_logger.error(f"Missing required keys in Claude response: {missing_keys}")
-            app_logger.error(f"Available keys: {available_keys}")
-            raise IncompleteClaudeResponseError(
-                f"Claude API returned incomplete response. Missing keys: {missing_keys}. "
-                f"Available keys: {available_keys}"
-            )
-
     def score_and_tailor_resume(
         self,
         resume_text: str,
@@ -578,26 +577,10 @@ class ClaudeProvider(AIProvider):
             )
             content = response.content[0].text
             app_logger.info("Claude API call successful")
-            app_logger.debug(f"Claude response content (first 500 chars): {content[:500]}")
-
-            try:
-                parsed_response = self._parse_json_response(content)
-                app_logger.debug(f"Parsed response keys: {parsed_response.keys()}")
-            except (json.JSONDecodeError, ValueError) as parse_error:
-                app_logger.error(f"Failed to parse Claude response: {parse_error}")
-                raise IncompleteClaudeResponseError(
-                    f"Claude API returned invalid or unparseable response: {str(parse_error)}"
-                ) from parse_error
-
-            # Validate required keys using extracted method
-            try:
-                self._validate_score_response(parsed_response)
-            except IncompleteClaudeResponseError as validation_error:
-                # Re-raise with full context
-                raise validation_error
-
-            return parsed_response
-        except (IncompleteClaudeResponseError, InsufficientCreditsError):
+            parsed = self._parse_json_response(content)
+            self._validate_score_response(parsed)
+            return parsed
+        except (IncompleteResponseError, InsufficientCreditsError):
             raise
         except Exception as e:
             app_logger.error(f"Claude API error: {str(e)}")
@@ -674,8 +657,10 @@ class GroqProvider(AIProvider):
             )
             content = response.choices[0].message.content or ""
             app_logger.info("Groq API call successful")
-            return self._parse_json_response(content)
-        except InsufficientCreditsError:
+            parsed = self._parse_json_response(content)
+            self._validate_score_response(parsed)
+            return parsed
+        except (IncompleteResponseError, InsufficientCreditsError):
             raise
         except Exception as e:
             app_logger.error(f"Groq API error: {str(e)}")
@@ -768,7 +753,11 @@ class OllamaProvider(AIProvider):
             )
             content = response["message"]["content"]
             app_logger.info("Ollama call successful")
-            return self._parse_json_response(content)
+            parsed = self._parse_json_response(content)
+            self._validate_score_response(parsed)
+            return parsed
+        except IncompleteResponseError:
+            raise
         except Exception as e:
             app_logger.error(f"Ollama error: {str(e)}")
             raise Exception(f"Ollama error: {str(e)}")

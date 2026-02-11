@@ -366,3 +366,27 @@ class TestPromptGeneration:
 
         assert "JSON" in prompt or "json" in prompt
         assert "Return ONLY raw JSON" in prompt
+
+    def test_prompt_contains_section_ordering(self):
+        provider = OpenAIProvider("test_key")
+        prompt = provider._create_score_and_tailor_prompt("resume", "job")
+        assert "SECTION ORDER" in prompt
+        assert "Do NOT add sections" in prompt
+
+    def test_validate_score_response_on_base_class(self):
+        """All providers validate response schema via the base class method"""
+        assert hasattr(AIProvider, "_validate_score_response")
+
+    def test_custom_prompt_appended_not_replaced(self):
+        """custom_prompt is appended as additional instructions, not replacing the whole prompt"""
+        provider = OpenAIProvider("test_key")
+        prompt = provider._create_score_and_tailor_prompt(
+            resume_text="my resume",
+            job_description="my job",
+            custom_prompt="Focus on leadership skills",
+        )
+        # Standard JSON format instructions still present
+        assert '"original_score"' in prompt
+        assert '"tailored_resume_lines"' in prompt
+        # Custom instruction appended
+        assert "Focus on leadership skills" in prompt
