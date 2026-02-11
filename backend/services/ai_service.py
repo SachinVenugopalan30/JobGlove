@@ -1,4 +1,5 @@
 import json
+import re
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -252,6 +253,26 @@ RESPONSE FORMAT:
 - Start your response directly with the opening brace {{
 - End your response directly with the closing brace }}"""
 
+    def _repair_json(self, text: str) -> str:
+        """Attempt to repair common JSON issues from LLM output."""
+        repaired = text
+
+        # Remove trailing commas before } or ]
+        repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+
+        # Try to close unclosed braces/brackets (truncated response)
+        open_braces = repaired.count("{") - repaired.count("}")
+        open_brackets = repaired.count("[") - repaired.count("]")
+
+        if open_braces > 0 or open_brackets > 0:
+            last_char = repaired.rstrip()[-1] if repaired.rstrip() else ""
+            if last_char not in ('"', "}", "]", "e", "l", "u") and not last_char.isdigit():
+                repaired = repaired.rstrip() + '"'
+            repaired += "]" * max(0, open_brackets)
+            repaired += "}" * max(0, open_braces)
+
+        return repaired
+
     def _parse_json_response(self, response_text: str) -> dict[str, Any]:
         """Parse JSON from AI response, handling markdown code blocks if present"""
         cleaned = response_text.strip()
@@ -269,20 +290,28 @@ RESPONSE FORMAT:
         cleaned = cleaned.strip()
 
         # Try to find the JSON object boundaries
-        # Look for the first '{' and last '}'
         start_idx = cleaned.find("{")
         end_idx = cleaned.rfind("}")
 
+        trimmed = cleaned
         if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            cleaned = cleaned[start_idx : end_idx + 1]
+            trimmed = cleaned[start_idx : end_idx + 1]
 
+        # Try parsing the boundary-trimmed version first
         try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            app_logger.error(f"Failed to parse JSON response: {e}")
-            app_logger.error(f"Response text (first 1000 chars): {response_text[:1000]}")
-            app_logger.error(f"Response text (last 500 chars): {response_text[-500:]}")
-            raise ValueError(f"AI returned invalid JSON: {str(e)}")
+            parsed = json.loads(trimmed)
+        except json.JSONDecodeError:
+            # Boundary trimming may have cut a truncated response; repair the full cleaned text
+            text_from_start = cleaned[start_idx:] if start_idx != -1 else cleaned
+            repaired = self._repair_json(text_from_start)
+            try:
+                parsed = json.loads(repaired)
+                app_logger.warning("JSON parse succeeded after repair")
+            except json.JSONDecodeError as e:
+                app_logger.error(f"Failed to parse JSON even after repair: {e}")
+                app_logger.error(f"Response text (first 1000 chars): {response_text[:1000]}")
+                app_logger.error(f"Response text (last 500 chars): {response_text[-500:]}")
+                raise ValueError(f"AI returned invalid JSON: {str(e)}")
 
         # Normalize tailored_resume_lines -> tailored_resume
         if "tailored_resume_lines" in parsed and isinstance(parsed["tailored_resume_lines"], list):

@@ -107,6 +107,18 @@ class TestAIProviderJSONParsing:
         assert result["tailored_resume"] == "[EDUCATION]\nMIT | Cambridge, MA\nBS CS | 2024"
         assert "tailored_resume_lines" not in result
 
+    def test_parse_json_repairs_trailing_comma(self):
+        provider = OpenAIProvider("test_key")
+        broken = '{"original_score": {"total_score": 70,}, "tailored_resume": "text", "tailored_score": {"total_score": 80}}'
+        result = provider._parse_json_response(broken)
+        assert result["original_score"]["total_score"] == 70
+
+    def test_parse_json_repairs_truncated_response(self):
+        provider = OpenAIProvider("test_key")
+        truncated = '{"original_score": {"total_score": 70, "keyword_match_score": 70, "relevance_score": 70, "ats_score": 70, "quality_score": 70, "recommendations": []}, "tailored_resume": "some text", "tailored_score": {"total_score": 80'
+        result = provider._parse_json_response(truncated)
+        assert result["tailored_resume"] == "some text"
+
     def test_parse_json_leaves_tailored_resume_string_untouched(self):
         """If model returns tailored_resume as string, it stays as-is"""
         provider = OpenAIProvider("test_key")
