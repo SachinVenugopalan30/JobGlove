@@ -162,7 +162,7 @@ Respond with ONLY a valid JSON object in this exact format (no markdown code fen
     "quality_score": <number 0-100>,
     "recommendations": ["<recommendation 1>", "<recommendation 2>", "..."]
   }},
-  "tailored_resume": "<full tailored resume text>",
+  "tailored_resume_lines": ["<line 1>", "<line 2>", "...one element per line of the resume..."],
   "tailored_score": {{
     "total_score": <number 0-100>,
     "keyword_match_score": <number 0-100>,
@@ -277,12 +277,19 @@ RESPONSE FORMAT:
             cleaned = cleaned[start_idx : end_idx + 1]
 
         try:
-            return json.loads(cleaned)
+            parsed = json.loads(cleaned)
         except json.JSONDecodeError as e:
             app_logger.error(f"Failed to parse JSON response: {e}")
             app_logger.error(f"Response text (first 1000 chars): {response_text[:1000]}")
             app_logger.error(f"Response text (last 500 chars): {response_text[-500:]}")
             raise ValueError(f"AI returned invalid JSON: {str(e)}")
+
+        # Normalize tailored_resume_lines -> tailored_resume
+        if "tailored_resume_lines" in parsed and isinstance(parsed["tailored_resume_lines"], list):
+            parsed["tailored_resume"] = "\n".join(parsed["tailored_resume_lines"])
+            del parsed["tailored_resume_lines"]
+
+        return parsed
 
     def _create_prompt(
         self, resume_text: str, job_description: str, custom_prompt: str | None = None

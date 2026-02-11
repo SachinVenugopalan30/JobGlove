@@ -93,6 +93,33 @@ class TestAIProviderJSONParsing:
         with pytest.raises(ValueError, match="AI returned invalid JSON"):
             provider._parse_json_response(json_str)
 
+    def test_parse_json_joins_tailored_resume_lines(self):
+        """tailored_resume_lines array gets normalized to tailored_resume string"""
+        provider = OpenAIProvider("test_key")
+        response = json.dumps(
+            {
+                "original_score": {"total_score": 70},
+                "tailored_resume_lines": ["[EDUCATION]", "MIT | Cambridge, MA", "BS CS | 2024"],
+                "tailored_score": {"total_score": 80},
+            }
+        )
+        result = provider._parse_json_response(response)
+        assert result["tailored_resume"] == "[EDUCATION]\nMIT | Cambridge, MA\nBS CS | 2024"
+        assert "tailored_resume_lines" not in result
+
+    def test_parse_json_leaves_tailored_resume_string_untouched(self):
+        """If model returns tailored_resume as string, it stays as-is"""
+        provider = OpenAIProvider("test_key")
+        response = json.dumps(
+            {
+                "original_score": {"total_score": 70},
+                "tailored_resume": "already a string",
+                "tailored_score": {"total_score": 80},
+            }
+        )
+        result = provider._parse_json_response(response)
+        assert result["tailored_resume"] == "already a string"
+
 
 class TestOpenAIProviderScoreAndTailor:
     """Test OpenAI provider score_and_tailor_resume method"""
@@ -306,7 +333,7 @@ class TestPromptGeneration:
         assert "Tailor the resume" in prompt
         assert "Score the tailored resume" in prompt
         assert "original_score" in prompt
-        assert "tailored_resume" in prompt
+        assert "tailored_resume" in prompt or "tailored_resume_lines" in prompt
         assert "tailored_score" in prompt
         assert "keyword_match_score" in prompt
         assert "relevance_score" in prompt
