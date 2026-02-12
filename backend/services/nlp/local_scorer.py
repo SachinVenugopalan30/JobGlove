@@ -1,18 +1,19 @@
 """Local resume scoring module that combines all NLP analysis."""
 
-from typing import Dict, List
+
+from utils.logger import app_logger
+
 from .skill_extractor import (
+    calculate_keyword_match,
     extract_keywords_from_job_description,
     extract_keywords_from_resume,
-    calculate_keyword_match
 )
 from .text_analyzer import (
+    analyze_text_quality,
     calculate_keyword_density,
-    check_ats_compatibility,
     calculate_text_similarity,
-    analyze_text_quality
+    check_ats_compatibility,
 )
-from utils.logger import app_logger
 
 KEYWORD_MATCH_WEIGHT = 0.40
 RELEVANCE_WEIGHT = 0.25
@@ -20,7 +21,7 @@ ATS_WEIGHT = 0.20
 QUALITY_WEIGHT = 0.15
 
 
-def score_resume_against_job(resume_text: str, job_description: str) -> Dict:
+def score_resume_against_job(resume_text: str, job_description: str) -> dict:
     """
     Score resume against job description using local NLP.
 
@@ -171,7 +172,7 @@ def _calculate_total_score(keyword_score: float, relevance_score: float,
     return int(round(total))
 
 
-def generate_recommendations(score_data: Dict) -> List[str]:
+def generate_recommendations(score_data: dict) -> list[str]:
     """
     Generate actionable recommendations based on scores.
 
@@ -227,7 +228,7 @@ def generate_recommendations(score_data: Dict) -> List[str]:
     return recommendations[:8]
 
 
-def _fallback_score(error_message: str) -> Dict:
+def _fallback_score(error_message: str) -> dict:
     """
     Return fallback score when scoring fails.
 

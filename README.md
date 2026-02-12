@@ -4,8 +4,9 @@
 
 ## ✨ Features
 
-- **Multi-AI Provider Support**: Choose between OpenAI GPT-4, Google Gemini, or Anthropic Claude
-- **Configurable AI Models**: Select specific models (gpt-4o, gemini-2.5-flash, claude-haiku-4-5-20251001, etc.) via environment variables
+- **Multi-AI Provider Support**: Choose between OpenAI GPT-4, Google Gemini, Anthropic Claude, Groq, or Ollama (local models)
+- **Configurable AI Models**: Select specific models (gpt-4o, gemini-2.5-flash, claude-haiku-4-5-20251001, llama3.2, etc.) via environment variables
+- **Local AI Support**: Run models locally with Ollama for complete privacy and no API costs
 - **Multiple Format Support**: Upload PDF or DOCX resumes
 - **AI-Powered Tailoring**: Automatically optimizes your resume for job descriptions
 - **Resume Scoring**: Get detailed scores on keyword matching, relevance, and ATS compatibility
@@ -22,7 +23,7 @@ The easiest way to run JobGlove is with Docker:
 
 ### Prerequisites
 - Docker and Docker Compose installed on your system
-- At least one AI API key (OpenAI, Gemini, or Anthropic)
+- At least one AI API key (OpenAI, Gemini, Anthropic, or Groq) OR use Ollama for local models (no API key needed)
 
 ### Steps
 
@@ -66,12 +67,20 @@ If you prefer to run without Docker:
 ```bash
 cd backend
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies
-pip install -r requirements.txt
+# Create virtual environment with uv
+uv venv
+
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies with uv
+uv pip install -e .
+
+# Install development dependencies (optional)
+uv pip install -e ".[dev]"
 
 # Configure environment
 cp ../.env.example ../.env
@@ -101,14 +110,14 @@ Frontend runs on `http://localhost:5173` (development) or served by Flask in pro
 
 1. **Upload Your Resume**: Drag and drop or click to upload a PDF or DOCX file
 2. **Enter Details**: Provide your name, job title, company, and paste the job description
-3. **Select AI Provider**: Choose your preferred AI service (must have API key configured)
+3. **Select AI Provider**: Choose OpenAI, Gemini, Claude, Groq (requires API key), or Ollama (local, no API key needed)
 4. **Get Results**: View your score breakdown and download the tailored resume
 
 ## 🏗️ Architecture
 
 ### Backend (Flask/Python)
 - **Framework**: Flask with Flask-CORS
-- **AI Integration**: OpenAI, Google Gemini, Anthropic Claude APIs
+- **AI Integration**: OpenAI, Google Gemini, Anthropic Claude, Groq APIs, and Ollama (local models)
 - **Document Processing**: PyPDF2, python-docx, PyMuPDF, pdfplumber
 - **LaTeX Generation**: PyLaTeX + system LaTeX distribution
 - **Database**: SQLAlchemy with SQLite
@@ -178,6 +187,8 @@ DEFAULT_USER_NAME=User          # Default name for resumes
 - **OpenAI**: [platform.openai.com](https://platform.openai.com/)
 - **Google Gemini**: [ai.google.dev](https://ai.google.dev/)
 - **Anthropic Claude**: [console.anthropic.com](https://console.anthropic.com/)
+- **Groq**: [console.groq.com](https://console.groq.com/)
+- **Ollama**: No API key needed - runs locally ([ollama.ai](https://ollama.ai/))
 
 ## 🧪 Testing
 
@@ -185,10 +196,10 @@ DEFAULT_USER_NAME=User          # Default name for resumes
 
 ```bash
 cd backend
-source venv/bin/activate
-pytest                          # Run all tests
-pytest --cov                    # Run with coverage
-pytest -v tests/test_routes.py  # Run specific test file
+source .venv/bin/activate
+uv run pytest                   # Run all tests
+uv run pytest --cov             # Run with coverage
+uv run pytest -v tests/test_routes.py  # Run specific test file
 ```
 
 ### Frontend Tests
@@ -242,8 +253,13 @@ Your resume is scored across four categories:
 ```bash
 # Backend (with hot reload)
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 python app.py
+
+# Linting and formatting with ruff
+uv run ruff check .             # Check for issues
+uv run ruff check --fix .       # Auto-fix issues
+uv run ruff format .            # Format code
 
 # Frontend (with hot reload)
 cd frontend

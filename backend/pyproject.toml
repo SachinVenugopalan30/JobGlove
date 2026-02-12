@@ -1,0 +1,101 @@
+[project]
+name = "jobglove"
+version = "1.0.0"
+description = "AI-powered resume tailoring application"
+readme = "../README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.1.2",
+    "flask-cors>=6.0.1",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.2.1",
+    "openai>=2.7.1",
+    "google-genai>=1.0.0",
+    "anthropic>=0.72.0",
+    "groq>=0.13.0",
+    "ollama>=0.3.0",
+    "pylatex>=1.4.2",
+    "requests>=2.32.5",
+    "werkzeug>=3.1.3",
+    "sqlalchemy>=2.0.44",
+    "pymupdf>=1.26.6",
+    "pdfplumber>=0.11.7",
+    "sentence-transformers>=3.3.1",
+    "scikit-learn>=1.7.2",
+    "gunicorn>=23.0.0",
+    "ruff>=0.14.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-flask>=1.3.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["routes", "services", "utils", "templates", "database"]
+include = ["*.py", "templates/*.tex"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "W191",  # indentation contains tabs
+    "B904",  # Allow raising exceptions without from e
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+"tests/**/*.py" = ["ARG", "S101"]  # Allow unused arguments and asserts in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "venv/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false

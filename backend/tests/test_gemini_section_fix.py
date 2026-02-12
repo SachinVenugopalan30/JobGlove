@@ -2,7 +2,6 @@
 Test for fixing Gemini's missing square bracket issue in section headers.
 """
 
-import pytest
 from services.latex_generator import LaTeXGenerator
 
 

@@ -1,14 +1,15 @@
 """Entity extraction module for extracting structured information from resumes."""
 
 import re
-from typing import Optional, Dict, List
+
 import spacy
+
 from utils.logger import app_logger
 
 nlp = spacy.load('en_core_web_sm')
 
 
-def extract_name(text: str) -> Optional[str]:
+def extract_name(text: str) -> str | None:
     """
     Extract candidate name from resume using NER.
 
@@ -40,7 +41,7 @@ def extract_name(text: str) -> Optional[str]:
         return None
 
 
-def extract_email(text: str) -> Optional[str]:
+def extract_email(text: str) -> str | None:
     """
     Extract email address from resume using regex.
 
@@ -67,7 +68,7 @@ def extract_email(text: str) -> Optional[str]:
         return None
 
 
-def extract_phone(text: str) -> Optional[str]:
+def extract_phone(text: str) -> str | None:
     """
     Extract phone number from resume using regex.
 
@@ -105,7 +106,7 @@ def extract_phone(text: str) -> Optional[str]:
         return None
 
 
-def extract_sections(text: str) -> Dict[str, str]:
+def extract_sections(text: str) -> dict[str, str]:
     """
     Identify and extract resume sections.
 
@@ -166,7 +167,7 @@ def extract_sections(text: str) -> Dict[str, str]:
     return sections
 
 
-def extract_all_entities(text: str) -> Dict:
+def extract_all_entities(text: str) -> dict:
     """
     Extract all entities from resume.
 

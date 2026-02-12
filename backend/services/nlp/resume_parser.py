@@ -2,11 +2,11 @@
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import docx
 import fitz
 import pdfplumber
+
 from utils.logger import app_logger
 
 

@@ -1,4 +1,3 @@
-import pytest
 from services.scoring_service import calculate_cosine_similarity
 
 
@@ -64,20 +63,20 @@ class TestCosineSimilarity:
     def test_real_world_example(self):
         """Test with a realistic resume and job description"""
         resume = """
-        Senior Data Scientist with 7 years of experience in machine learning, 
-        statistical modeling, and predictive analytics. Proficient in Python, 
-        R, SQL, and TensorFlow. Led cross-functional teams to deploy ML models 
-        in production. Strong background in natural language processing and 
+        Senior Data Scientist with 7 years of experience in machine learning,
+        statistical modeling, and predictive analytics. Proficient in Python,
+        R, SQL, and TensorFlow. Led cross-functional teams to deploy ML models
+        in production. Strong background in natural language processing and
         computer vision.
         """
-        
+
         jd = """
         We are seeking a Data Scientist with strong machine learning skills.
         Must have experience with Python, SQL, and statistical analysis.
         Experience with NLP and deploying models to production is a plus.
         Team leadership experience preferred.
         """
-        
+
         score = calculate_cosine_similarity(resume, jd)
         # TF-IDF with stopwords removed can result in lower scores than expected
         # This is normal and shows semantic matching rather than simple word overlap

@@ -1,7 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-import os
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+
 from services.document_parser import DocumentParser
 
 

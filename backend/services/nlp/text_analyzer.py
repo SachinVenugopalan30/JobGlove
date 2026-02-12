@@ -1,17 +1,17 @@
 """Text analysis module for similarity, ATS compatibility, and quality checks."""
 
 import re
-from typing import Dict, List
+
+from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import nltk
-from nltk.corpus import stopwords
+
 from utils.logger import app_logger
 
 stop_words = set(stopwords.words('english'))
 
 
-def calculate_keyword_density(resume_text: str, job_keywords: List[str]) -> float:
+def calculate_keyword_density(resume_text: str, job_keywords: list[str]) -> float:
     """
     Calculate how frequently job keywords appear in resume.
 
@@ -44,7 +44,7 @@ def calculate_keyword_density(resume_text: str, job_keywords: List[str]) -> floa
         return 0.0
 
 
-def check_ats_compatibility(resume_text: str) -> Dict:
+def check_ats_compatibility(resume_text: str) -> dict:
     """
     Check ATS (Applicant Tracking System) compatibility.
 
@@ -192,7 +192,7 @@ def count_quantified_achievements(resume_text: str) -> int:
         return 0
 
 
-def extract_action_verbs(resume_text: str) -> List[str]:
+def extract_action_verbs(resume_text: str) -> list[str]:
     """
     Extract action verbs from resume.
 
@@ -221,7 +221,7 @@ def extract_action_verbs(resume_text: str) -> List[str]:
     return found_verbs
 
 
-def analyze_text_quality(resume_text: str) -> Dict:
+def analyze_text_quality(resume_text: str) -> dict:
     """
     Analyze overall text quality of resume.
 

@@ -1,14 +1,15 @@
 """Skill and keyword extraction module for dynamic keyword matching."""
 
 import re
-from typing import List, Dict, Set
+
 import spacy
+
 from utils.logger import app_logger
 
 nlp = spacy.load('en_core_web_sm')
 
 
-def extract_technical_terms(text: str) -> List[str]:
+def extract_technical_terms(text: str) -> list[str]:
     """
     Extract technical terms using POS tagging and NER.
 
@@ -27,7 +28,7 @@ def extract_technical_terms(text: str) -> List[str]:
     """
     doc = nlp(text)
     terms = set()
-    
+
     # Generic proper nouns to exclude (common names, places that aren't tech-relevant)
     generic_proper_nouns = {
         'January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -49,14 +50,13 @@ def extract_technical_terms(text: str) -> List[str]:
         # Only include PRODUCT and ORG entities (technologies and companies)
         # Skip GPE (geopolitical entities like cities/countries) and NORP (nationalities)
         # as they're usually not relevant to job skills
-        if ent.label_ in ['PRODUCT', 'ORG']:
-            if ent.text not in generic_proper_nouns:
-                terms.add(ent.text)
+        if ent.label_ in ['PRODUCT', 'ORG'] and ent.text not in generic_proper_nouns:
+            terms.add(ent.text)
 
     # Extract acronyms, but be more selective
     acronym_pattern = r'\b[A-Z]{2,}\b'
     acronyms = re.findall(acronym_pattern, text)
-    
+
     # Filter out common non-technical acronyms
     non_technical_acronyms = {'GPA', 'USA', 'PhD', 'MS', 'BS', 'BA', 'MA'}
     for acronym in acronyms:
@@ -66,7 +66,7 @@ def extract_technical_terms(text: str) -> List[str]:
     return list(terms)
 
 
-def extract_noun_phrases(text: str) -> List[str]:
+def extract_noun_phrases(text: str) -> list[str]:
     """
     Extract noun phrases from text.
 
@@ -78,7 +78,7 @@ def extract_noun_phrases(text: str) -> List[str]:
     """
     doc = nlp(text)
     noun_phrases = []
-    
+
     # Generic phrases to exclude (these are too common/generic)
     generic_phrases = {
         'job description', 'work experience', 'team player', 'team member',
@@ -86,37 +86,37 @@ def extract_noun_phrases(text: str) -> List[str]:
         'united states', 'new york', 'san francisco', 'los angeles',
         'problem solving', 'attention to detail', 'work ethic',
     }
-    
+
     for chunk in doc.noun_chunks:
         # Filter by length
         if len(chunk.text.strip()) < 3:
             continue
-        
+
         # Only extract 2-4 word phrases
         words = chunk.text.split()
         if len(words) < 2 or len(words) > 4:
             continue
-        
+
         # Check if phrase is too generic
         phrase_lower = chunk.text.lower().strip()
         if phrase_lower in generic_phrases:
             continue
-            
+
         # Require technical content: must have proper nouns or uppercase tokens
         # This filters out generic phrases like "job description" while keeping
         # technical terms like "Machine Learning" or "AWS Lambda"
         has_technical = any(
-            token.pos_ in ['PROPN', 'NOUN'] and token.text[0].isupper() 
+            token.pos_ in ['PROPN', 'NOUN'] and token.text[0].isupper()
             for token in chunk
         )
-        
+
         if has_technical or any(token.is_upper for token in chunk):
             noun_phrases.append(chunk.text.strip())
 
     return noun_phrases
 
 
-def extract_requirements(text: str) -> List[str]:
+def extract_requirements(text: str) -> list[str]:
     """
     Extract requirement statements from job description.
 
@@ -144,7 +144,7 @@ def extract_requirements(text: str) -> List[str]:
     return requirements
 
 
-def normalize_keywords(keywords: List[str]) -> List[str]:
+def normalize_keywords(keywords: list[str]) -> list[str]:
     """
     Normalize keywords by cleaning and deduplicating.
 
@@ -163,51 +163,51 @@ def normalize_keywords(keywords: List[str]) -> List[str]:
     """
     # Common stopwords
     stopwords = {'and', 'or', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'as', 'is', 'are', 'was', 'were', 'be', 'been'}
-    
+
     # Generic non-skill terms to exclude
     exclude_terms = {
         # Months
-        'january', 'february', 'march', 'april', 'may', 'june', 'july', 
+        'january', 'february', 'march', 'april', 'may', 'june', 'july',
         'august', 'september', 'october', 'november', 'december',
-        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-        
+        'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+
         # Days
         'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
         'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun',
-        
+
         # Date suffixes and patterns
         '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th',
         '11th', '12th', '13th', '14th', '15th', '16th', '17th', '18th', '19th', '20th',
         '21st', '22nd', '23rd', '24th', '25th', '26th', '27th', '28th', '29th', '30th', '31st',
-        
+
         # Generic academic/resume terms
-        'gpa', 'college', 'university', 'school', 'institute', 'education', 
+        'gpa', 'college', 'university', 'school', 'institute', 'education',
         'degree', 'bachelor', 'master', 'phd', 'graduate', 'undergraduate',
         'coursework', 'relevant coursework', 'extracurricular', 'activities',
-        
+
         # Generic work terms
-        'experience', 'responsibilities', 'duties', 'work', 'job', 'position', 
+        'experience', 'responsibilities', 'duties', 'work', 'job', 'position',
         'role', 'company', 'organization', 'team', 'project', 'projects',
         'description', 'summary', 'objective', 'skills', 'references',
         'ability', 'abilities', 'capability', 'capable',
-        
+
         # Generic adjectives
         'big', 'small', 'large', 'good', 'great', 'excellent', 'strong', 'weak',
-        
+
         # Generic action terms
         'build', 'connections', 'connection',
-        
+
         # Generic verbs/actions
         'responsible', 'managed', 'developed', 'created', 'designed', 'implemented',
         'worked', 'assisted', 'helped', 'supported', 'performed', 'conducted',
-        
+
         # Common locations (too generic)
         'city', 'state', 'country', 'usa', 'america', 'united states',
-        
+
         # Time periods
         'present', 'current', 'year', 'years', 'month', 'months', 'week', 'weeks',
         'day', 'days', 'hour', 'hours',
-        
+
         # Numbers and ranges
         'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
     }
@@ -225,37 +225,34 @@ def normalize_keywords(keywords: List[str]) -> List[str]:
         # Skip stopwords
         if keyword_lower in stopwords:
             continue
-            
+
         # Skip generic non-skill terms
         if keyword_lower in exclude_terms:
             continue
-            
+
         # Skip dates with ordinal suffixes (e.g., "27th", "May 27th")
         if re.search(r'\d+(st|nd|rd|th)', keyword_lower):
             continue
-            
+
         # Skip if it's just a number
         if keyword.replace('.', '').replace(',', '').isdigit():
             continue
-            
+
         # Skip very generic single letters
         if len(keyword) == 1:
             continue
 
         # Preserve acronyms (all caps, 2+ chars)
-        if keyword.isupper() and len(keyword) >= 2:
-            normalized.add(keyword)
-        # Preserve mixed case (likely proper nouns/technologies)
-        elif any(char.isupper() for char in keyword):
+        if keyword.isupper() and len(keyword) >= 2 or any(char.isupper() for char in keyword):
             normalized.add(keyword)
         # Convert others to lowercase
         else:
             normalized.add(keyword_lower)
 
-    return sorted(list(normalized))
+    return sorted(normalized)
 
 
-def extract_keywords_from_job_description(job_desc: str) -> List[str]:
+def extract_keywords_from_job_description(job_desc: str) -> list[str]:
     """
     Extract keywords and skills from job description.
 
@@ -299,7 +296,7 @@ def extract_keywords_from_job_description(job_desc: str) -> List[str]:
         return []
 
 
-def extract_keywords_from_resume(resume_text: str) -> List[str]:
+def extract_keywords_from_resume(resume_text: str) -> list[str]:
     """
     Extract keywords and skills from resume.
 
@@ -336,7 +333,7 @@ def extract_keywords_from_resume(resume_text: str) -> List[str]:
         return []
 
 
-def calculate_keyword_match(resume_keywords: List[str], job_keywords: List[str]) -> Dict:
+def calculate_keyword_match(resume_keywords: list[str], job_keywords: list[str]) -> dict:
     """
     Calculate keyword match between resume and job description.
 
@@ -361,8 +358,8 @@ def calculate_keyword_match(resume_keywords: List[str], job_keywords: List[str])
                 'match_percentage': 0.0
             }
 
-        resume_set = set(kw.lower() for kw in resume_keywords)
-        job_set = set(kw.lower() for kw in job_keywords)
+        resume_set = {kw.lower() for kw in resume_keywords}
+        job_set = {kw.lower() for kw in job_keywords}
 
         matched_lower = resume_set.intersection(job_set)
 

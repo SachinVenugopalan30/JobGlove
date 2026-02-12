@@ -4,14 +4,15 @@ Simplified test script for JobGlove backend
 Run this to quickly test core functionality without pytest
 """
 
-import sys
 import os
 import re
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from database.db import Resume, ResumeVersion, Score, get_session, init_db
 from services.latex_generator import LaTeXGenerator
-from database.db import init_db, get_session, Resume, ResumeVersion, Score
+
 
 class Colors:
     GREEN = '\033[92m'
@@ -158,8 +159,8 @@ def test_database_operations():
 
 def test_filename_generation():
     """Test filename sanitization and generation"""
-    import tempfile
     import subprocess
+    import tempfile
 
     # Check if pdflatex is available
     try:
@@ -225,7 +226,7 @@ Programming: Python, JavaScript
                 print_test("Filename Generation", True)
 
             return all_passed
-        except Exception as e:
+        except Exception:
             # If LaTeX compilation fails, at least check the filename logic
             # by testing the filename sanitization directly
             safe_name = re.sub(r'[^\w\s-]', '', 'John Doe').strip().replace(' ', '_')

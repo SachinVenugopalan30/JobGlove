@@ -11,11 +11,18 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      
+      - GROQ_API_KEY=${GROQ_API_KEY}
+
       # AI Model Configuration
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-haiku-4-5-20251001}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+
+      # Ollama Configuration (uses host machine's Ollama)
+      - OLLAMA_ENABLED=${OLLAMA_ENABLED:-false}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       
       # Application Settings
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
@@ -43,7 +50,7 @@ services:
       - ./backend/config.py:/app/backend/config.py
     
     restart: unless-stopped
-    
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health", "||", "exit", "1"]
       interval: 30s

@@ -46,9 +46,14 @@ Open .env in your text editor and add:
 ### Backend Setup
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+uv pip install -e .
 
 # Configure .env
 cp ../.env.example ../.env
@@ -68,6 +73,73 @@ Open: **http://localhost:5173**
 
 ---
 
+## Option 3: Using Local Models with Ollama
+
+Run AI models locally on your machine for free and complete privacy.
+
+### Docker Setup (Recommended)
+
+The Docker setup already includes Ollama service. After running `docker compose up -d`:
+
+```bash
+# Pull a model into the Ollama container
+docker exec -it jobglove-ollama ollama pull llama3.2
+
+# Or pull other models
+docker exec -it jobglove-ollama ollama pull mistral
+docker exec -it jobglove-ollama ollama pull phi3
+```
+
+**Enable in .env:**
+```bash
+OLLAMA_ENABLED=true
+OLLAMA_MODEL=llama3.2
+```
+
+Restart the containers:
+```bash
+docker compose restart jobglove
+```
+
+### Manual Setup
+
+1. **Install Ollama:**
+   - Visit [ollama.ai](https://ollama.ai)
+   - Download and install for your OS
+
+2. **Start Ollama:**
+   ```bash
+   ollama serve
+   ```
+
+3. **Pull a model (new terminal):**
+   ```bash
+   ollama pull llama3.2
+   ```
+
+4. **Enable in .env:**
+   ```bash
+   OLLAMA_ENABLED=true
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=llama3.2
+   ```
+
+5. **Restart backend:**
+   ```bash
+   cd backend
+   python app.py
+   ```
+
+**Popular models:**
+- `llama3.2` - Fast, good quality (default)
+- `llama3.1` - More capable, slower
+- `mistral` - Balanced performance
+- `phi3` - Lightweight, fast
+
+**Ollama will now appear as an available AI provider in the UI.**
+
+---
+
 ## Using JobGlove
 
 1. **Upload Resume** - Drag/drop your PDF or DOCX resume
@@ -76,7 +148,7 @@ Open: **http://localhost:5173**
    - Job Title (e.g., "Software Engineer")
    - Company (e.g., "Google")
    - Job Description (paste the full job posting)
-3. **Select AI Provider** - Choose OpenAI, Gemini, or Claude
+3. **Select AI Provider** - Choose OpenAI, Gemini, Claude, Groq, or Ollama
 4. **Click "Tailor Resume with AI"** - Wait 10-30 seconds
 5. **Download** - Get your tailored PDF and LaTeX files!
 
@@ -130,6 +202,41 @@ sudo chown -R $USER:$USER uploads outputs backend/logs
 **"Failed to extract text":**
 - Ensure your PDF is not scanned/image-based
 - Try converting to DOCX format
+
+### Ollama Issues
+
+**Ollama not appearing as available:**
+```bash
+# Check OLLAMA_ENABLED=true in .env
+# Restart the application
+docker compose restart jobglove
+```
+
+**"Connection refused" when using Ollama:**
+```bash
+# Check Ollama is running
+docker ps | grep ollama
+
+# View Ollama logs
+docker logs jobglove-ollama
+
+# Restart Ollama
+docker restart jobglove-ollama
+```
+
+**Ollama is slow:**
+- First run downloads the model (may take time)
+- Smaller models are faster: try phi3 instead of llama3.1
+- Check available memory: `docker stats jobglove-ollama`
+
+**No models available:**
+```bash
+# Pull a model first
+docker exec -it jobglove-ollama ollama pull llama3.2
+
+# List available models
+docker exec -it jobglove-ollama ollama list
+```
 
 ---
 

@@ -1,8 +1,9 @@
-import pytest
 import json
-import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 from flask import Flask
+
 from routes.resume import resume_bp
 
 

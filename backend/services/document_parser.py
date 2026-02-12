@@ -1,7 +1,8 @@
+from pathlib import Path
+
 import docx
 import fitz
-from pathlib import Path
-from typing import Optional
+
 
 class DocumentParser:
     @staticmethod
@@ -25,7 +26,7 @@ class DocumentParser:
         return resume_text
 
     @staticmethod
-    def extract_text_from_pdf(file_path: str) -> Optional[str]:
+    def extract_text_from_pdf(file_path: str) -> str | None:
         """
         Extract text content from a PDF file using PyMuPDF.
 
@@ -52,7 +53,7 @@ class DocumentParser:
             raise Exception(f"Error parsing PDF file: {str(e)}")
 
     @staticmethod
-    def extract_text(file_path: str) -> Optional[str]:
+    def extract_text(file_path: str) -> str | None:
         """
         Auto-detect file type and extract text from DOCX or PDF.
 
@@ -75,7 +76,7 @@ class DocumentParser:
             raise ValueError(f"Unsupported file type: {file_extension}")
 
     @staticmethod
-    def extract_text_from_docx(file_path: str) -> Optional[str]:
+    def extract_text_from_docx(file_path: str) -> str | None:
         """
         Extract text content from a DOCX file.
 
