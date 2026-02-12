@@ -1,6 +1,8 @@
 import json
+import os
 import re
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any
 
 import anthropic
@@ -119,6 +121,35 @@ class AIProvider(ABC):
             return OllamaProvider()
         else:
             raise ValueError(f"Unknown provider: {provider_name}")
+
+    def _save_debug_response(
+        self, provider_name: str, model: str, raw_response: str, parsed_data: dict = None
+    ):
+        """Save raw AI response to disk for debugging. Only runs if DEBUG_AI_RESPONSES=true."""
+        if not getattr(Config, "DEBUG_AI_RESPONSES", False):
+            return
+
+        debug_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "debug_responses")
+        os.makedirs(debug_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{provider_name}_{timestamp}.json"
+        filepath = os.path.join(debug_dir, filename)
+
+        debug_data = {
+            "provider": provider_name,
+            "model": model,
+            "timestamp": datetime.now().isoformat(),
+            "raw_response": raw_response,
+            "parsed_data": parsed_data,
+        }
+
+        try:
+            with open(filepath, "w") as f:
+                json.dump(debug_data, f, indent=2)
+            app_logger.debug(f"Saved debug response to {filepath}")
+        except Exception as e:
+            app_logger.warning(f"Failed to save debug response: {e}")
 
     def _create_score_and_tailor_prompt(
         self,
@@ -420,6 +451,7 @@ class OpenAIProvider(AIProvider):
             app_logger.info("OpenAI API call successful")
             parsed = self._parse_json_response(content)
             self._validate_score_response(parsed)
+            self._save_debug_response("openai", self.model, content, parsed)
             return parsed
         except (IncompleteResponseError, InsufficientCreditsError):
             raise
@@ -504,6 +536,7 @@ class GeminiProvider(AIProvider):
             app_logger.info("Gemini API call successful")
             parsed = self._parse_json_response(content)
             self._validate_score_response(parsed)
+            self._save_debug_response("gemini", self.model_name, content, parsed)
             return parsed
         except (IncompleteResponseError, InsufficientCreditsError):
             raise
@@ -579,6 +612,7 @@ class ClaudeProvider(AIProvider):
             app_logger.info("Claude API call successful")
             parsed = self._parse_json_response(content)
             self._validate_score_response(parsed)
+            self._save_debug_response("claude", self.model, content, parsed)
             return parsed
         except (IncompleteResponseError, InsufficientCreditsError):
             raise
@@ -659,6 +693,7 @@ class GroqProvider(AIProvider):
             app_logger.info("Groq API call successful")
             parsed = self._parse_json_response(content)
             self._validate_score_response(parsed)
+            self._save_debug_response("groq", self.model, content, parsed)
             return parsed
         except (IncompleteResponseError, InsufficientCreditsError):
             raise
@@ -755,6 +790,7 @@ class OllamaProvider(AIProvider):
             app_logger.info("Ollama call successful")
             parsed = self._parse_json_response(content)
             self._validate_score_response(parsed)
+            self._save_debug_response("ollama", self.model, content, parsed)
             return parsed
         except IncompleteResponseError:
             raise

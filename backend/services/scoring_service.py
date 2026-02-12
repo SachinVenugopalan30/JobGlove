@@ -1,7 +1,8 @@
 import json
-from typing import Dict, Optional
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 from services.ai_service import AIProvider
 from utils.logger import app_logger
 
@@ -9,8 +10,8 @@ from utils.logger import app_logger
 try:
     from services import embedding_manager
     if embedding_manager.SENTENCE_TRANSFORMERS_AVAILABLE:
-        from services.embedding_manager import get_embedding_manager
         from services.ats_recommendations import ATSRecommendationEngine
+        from services.embedding_manager import get_embedding_manager
         ENHANCED_SCORING_AVAILABLE = True
     else:
         ENHANCED_SCORING_AVAILABLE = False
@@ -21,11 +22,11 @@ except ImportError:
 def calculate_cosine_similarity(resume_text: str, job_description: str) -> float:
     """
     Calculate cosine similarity between resume and job description using TF-IDF vectorization.
-    
+
     Args:
         resume_text: The resume text content
         job_description: The job description text
-        
+
     Returns:
         Similarity score as a percentage (0-100)
     """
@@ -33,11 +34,11 @@ def calculate_cosine_similarity(resume_text: str, job_description: str) -> float
         # Preprocess: Remove extra whitespace and ensure non-empty strings
         resume_cleaned = ' '.join(resume_text.strip().split())
         jd_cleaned = ' '.join(job_description.strip().split())
-        
+
         if not resume_cleaned or not jd_cleaned:
             app_logger.warning("Empty resume or job description provided for similarity calculation")
             return 0.0
-        
+
         # Create TF-IDF vectors
         vectorizer = TfidfVectorizer(
             lowercase=True,
@@ -45,19 +46,19 @@ def calculate_cosine_similarity(resume_text: str, job_description: str) -> float
             max_features=1000,  # Limit features for performance
             ngram_range=(1, 2)  # Use unigrams and bigrams
         )
-        
+
         # Fit and transform both texts
         tfidf_matrix = vectorizer.fit_transform([resume_cleaned, jd_cleaned])
-        
+
         # Calculate cosine similarity
         similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-        
+
         # Convert to percentage and round
         similarity_percentage = round(similarity * 100, 2)
-        
+
         app_logger.info(f"Cosine similarity calculated: {similarity_percentage}%")
         return similarity_percentage
-        
+
     except Exception as e:
         app_logger.error(f"Error calculating cosine similarity: {e}")
         return 0.0
@@ -67,18 +68,18 @@ def calculate_embedding_similarity(resume_text: str, job_description: str) -> fl
     """
     Calculate semantic similarity using embeddings (if available).
     Falls back to 0 if sentence-transformers is not installed.
-    
+
     Args:
         resume_text: The resume content
         job_description: The job description
-        
+
     Returns:
         Similarity score as percentage (0-100)
     """
     if not ENHANCED_SCORING_AVAILABLE:
         app_logger.warning("Embedding-based scoring not available. Install sentence-transformers.")
         return 0.0
-    
+
     try:
         embedding_manager = get_embedding_manager()
         similarity = embedding_manager.calculate_embedding_similarity(resume_text, job_description)
@@ -96,13 +97,13 @@ def generate_ats_recommendations(
 ) -> dict:
     """
     Generate comprehensive ATS recommendations.
-    
+
     Args:
         resume_text: The resume content
         job_description: The job description
         embedding_similarity: Optional embedding similarity score
         tfidf_similarity: Optional TF-IDF similarity score
-        
+
     Returns:
         Dictionary containing ATS score and recommendations
     """
@@ -116,7 +117,7 @@ def generate_ats_recommendations(
                 'description': 'Install required packages for ATS analysis'
             }]
         }
-    
+
     try:
         engine = ATSRecommendationEngine()
         recommendations = engine.generate_recommendations(

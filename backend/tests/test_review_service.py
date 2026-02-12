@@ -1,7 +1,10 @@
-import pytest
 import json
 from unittest.mock import Mock, patch
+
+import pytest
+
 from services.review_service import ReviewService, create_review_service
+
 
 @pytest.mark.unit
 class TestReviewService:
@@ -123,7 +126,7 @@ University Name
         service = ReviewService(Mock())
         result = service._extract_bullets_fallback(resume_text)
 
-        education_bullets = [b for b in result if b['section'] == 'Education']
+        [b for b in result if b['section'] == 'Education']
         experience_bullets = [b for b in result if b['section'] == 'Experience']
         project_bullets = [b for b in result if b['section'] == 'Projects']
 

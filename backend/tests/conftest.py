@@ -1,12 +1,14 @@
-import pytest
 import os
 import sys
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app import app as flask_app
-from database.db import Base, engine, Session, Resume, ResumeVersion, Score, ReviewBullet
+from database.db import Base, Session, engine
+
 
 @pytest.fixture
 def app():

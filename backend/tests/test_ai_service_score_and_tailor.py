@@ -1,4 +1,5 @@
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -390,3 +391,43 @@ class TestPromptGeneration:
         assert '"tailored_resume_lines"' in prompt
         # Custom instruction appended
         assert "Focus on leadership skills" in prompt
+
+
+class TestDebugResponseLogging:
+    """Test that raw AI responses are saved to disk when DEBUG_AI_RESPONSES=true"""
+
+    def test_save_debug_response_creates_file(self, tmp_path, monkeypatch):
+        # Point the debug_responses dir to tmp_path by faking __file__
+        fake_services_dir = tmp_path / "services"
+        fake_services_dir.mkdir()
+        monkeypatch.setattr(
+            "services.ai_service.Config",
+            type("Config", (), {"DEBUG_AI_RESPONSES": True}),
+        )
+        import services.ai_service as mod
+
+        monkeypatch.setattr(mod, "__file__", str(fake_services_dir / "ai_service.py"))
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider._save_debug_response("openai", "gpt-4o-mini", '{"test": true}', {"test": True})
+
+        debug_dir = tmp_path / "debug_responses"
+        files = list(debug_dir.glob("openai_*.json"))
+        assert len(files) == 1
+        data = json.loads(files[0].read_text())
+        assert data["provider"] == "openai"
+        assert data["model"] == "gpt-4o-mini"
+        assert data["raw_response"] == '{"test": true}'
+        assert data["parsed_data"] == {"test": True}
+
+    def test_save_debug_response_skipped_when_disabled(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "services.ai_service.Config",
+            type("Config", (), {"DEBUG_AI_RESPONSES": False}),
+        )
+
+        provider = OpenAIProvider.__new__(OpenAIProvider)
+        provider._save_debug_response("openai", "gpt-4o-mini", '{"test": true}')
+
+        debug_dir = tmp_path / "debug_responses"
+        assert not debug_dir.exists()

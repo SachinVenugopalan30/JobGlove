@@ -1,6 +1,7 @@
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+from logging.handlers import RotatingFileHandler
+
 
 def setup_logger(name: str, log_file: str, level=logging.INFO):
     """Set up logger with file and console handlers"""

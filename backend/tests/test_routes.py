@@ -1,8 +1,8 @@
-import pytest
 import json
-from unittest.mock import Mock, patch, MagicMock
-import os
-import tempfile
+from unittest.mock import Mock, patch
+
+import pytest
+
 
 @pytest.mark.integration
 class TestResumeRoutes:
@@ -21,9 +21,9 @@ class TestResumeRoutes:
 
             assert response.status_code == 200
             data = json.loads(response.data)
-            assert data['openai'] == True
-            assert data['gemini'] == False
-            assert data['claude'] == True
+            assert data['openai']
+            assert not data['gemini']
+            assert data['claude']
 
     def test_score_endpoint_success(self, client, sample_resume_text, sample_job_description):
         """Test /api/score endpoint with valid data"""

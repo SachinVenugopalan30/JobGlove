@@ -7,7 +7,6 @@ HEADER -> EDUCATION -> TECHNICAL SKILLS -> EXPERIENCE -> PROJECTS
 regardless of the order in which the AI provides them.
 """
 
-import pytest
 from services.latex_generator import LaTeXGenerator
 
 
@@ -21,36 +20,39 @@ class TestSectionOrdering:
 John Doe | john@example.com | 555-1234 | linkedin.com/in/johndoe
 
 [PROJECTS]
-Project A | Jan 2024
+Project A | Python, React
+Jan 2024
 - Built something
 
 [EDUCATION]
-BS Computer Science | University of X | 2020-2024
+University of X | Boston, MA
+BS Computer Science | 2020-2024
 
 [TECHNICAL SKILLS]
 Languages: Python, Java
 ML: TensorFlow
 
 [EXPERIENCE]
-Software Engineer | Google | Jan 2024 - Present
+Software Engineer | Jan 2024 - Present
+Google | Mountain View, CA
 - Developed features
 """
         result = LaTeXGenerator.parse_structured_resume(resume_text)
-        
+
         # Find section positions in output
-        header_pos = result.find(r'\textbf{\Huge')
-        education_pos = result.find(r'\section{Education}')
-        skills_pos = result.find(r'\section{Technical Skills}')
-        experience_pos = result.find(r'\section{Experience}')
-        projects_pos = result.find(r'\section{Projects}')
-        
+        header_pos = result.find(r"\textbf{\Huge")
+        education_pos = result.find(r"\section{Education}")
+        skills_pos = result.find(r"\section{Technical Skills}")
+        experience_pos = result.find(r"\section{Experience}")
+        projects_pos = result.find(r"\section{Projects}")
+
         # Verify all sections exist
         assert header_pos != -1, "Header section not found"
         assert education_pos != -1, "Education section not found"
         assert skills_pos != -1, "Technical Skills section not found"
         assert experience_pos != -1, "Experience section not found"
         assert projects_pos != -1, "Projects section not found"
-        
+
         # Verify correct order: HEADER < EDUCATION < TECHNICAL SKILLS < EXPERIENCE < PROJECTS
         assert header_pos < education_pos, "Header should come before Education"
         assert education_pos < skills_pos, "Education should come before Technical Skills"
@@ -63,28 +65,31 @@ Software Engineer | Google | Jan 2024 - Present
 Jane Smith | jane@example.com | 555-5678
 
 [EDUCATION]
-MS Data Science | Stanford | 2022-2024
+Stanford University | Stanford, CA
+MS Data Science | 2022-2024
 
 [TECHNICAL SKILLS]
 Languages: Python, R
 
 [EXPERIENCE]
-Data Scientist | Meta | Jan 2024 - Present
+Data Scientist | Jan 2024 - Present
+Meta | Menlo Park, CA
 - Analyzed data
 
 [PROJECTS]
-Project B | Mar 2024
+Project B | Python, Scikit-learn
+Mar 2024
 - Implemented ML model
 """
         result = LaTeXGenerator.parse_structured_resume(resume_text)
-        
+
         # Find section positions
-        header_pos = result.find(r'\textbf{\Huge')
-        education_pos = result.find(r'\section{Education}')
-        skills_pos = result.find(r'\section{Technical Skills}')
-        experience_pos = result.find(r'\section{Experience}')
-        projects_pos = result.find(r'\section{Projects}')
-        
+        header_pos = result.find(r"\textbf{\Huge")
+        education_pos = result.find(r"\section{Education}")
+        skills_pos = result.find(r"\section{Technical Skills}")
+        experience_pos = result.find(r"\section{Experience}")
+        projects_pos = result.find(r"\section{Projects}")
+
         # Verify correct order maintained
         assert header_pos < education_pos < skills_pos < experience_pos < projects_pos
 
@@ -95,22 +100,24 @@ Project B | Mar 2024
 Bob Johnson | bob@example.com
 
 [EDUCATION]
-BS Engineering | MIT | 2020-2024
+MIT | Cambridge, MA
+BS Engineering | 2020-2024
 
 [EXPERIENCE]
-Engineer | Apple | Jan 2024 - Present
+Engineer | Jan 2024 - Present
+Apple | Cupertino, CA
 - Built systems
 """
         result = LaTeXGenerator.parse_structured_resume(resume_text)
-        
-        header_pos = result.find(r'\textbf{\Huge')
-        education_pos = result.find(r'\section{Education}')
-        experience_pos = result.find(r'\section{Experience}')
-        
+
+        header_pos = result.find(r"\textbf{\Huge")
+        education_pos = result.find(r"\section{Education}")
+        experience_pos = result.find(r"\section{Experience}")
+
         # Skills and Projects should not exist
-        assert result.find(r'\section{Technical Skills}') == -1
-        assert result.find(r'\section{Projects}') == -1
-        
+        assert result.find(r"\section{Technical Skills}") == -1
+        assert result.find(r"\section{Projects}") == -1
+
         # Remaining sections should be in order
         assert header_pos < education_pos < experience_pos
 
@@ -130,8 +137,8 @@ Languages: Python
 Developer | Company | 2024
 """
         result1 = LaTeXGenerator.parse_structured_resume(resume_text1)
-        assert r'\section{Technical Skills}' in result1
-        
+        assert r"\section{Technical Skills}" in result1
+
         # Test with just "SKILLS"
         resume_text2 = """[HEADER]
 Test User | test@example.com
@@ -147,7 +154,7 @@ Developer | Company | 2024
 """
         result2 = LaTeXGenerator.parse_structured_resume(resume_text2)
         # SKILLS should still be formatted as Technical Skills section
-        assert r'\section{Technical Skills}' in result2
+        assert r"\section{Technical Skills}" in result2
 
     def test_duplicate_sections_use_first_occurrence(self):
         """Test that if AI mistakenly provides duplicate sections, we use first one."""
@@ -171,9 +178,9 @@ Developer | 2024
 - Developed software
 """
         result = LaTeXGenerator.parse_structured_resume(resume_text)
-        
+
         # Should only have one Education section (the first one)
-        assert result.count(r'\section{Education}') == 1
+        assert result.count(r"\section{Education}") == 1
         # Note: Dict behavior means last occurrence will be used, not first
         # This is acceptable behavior - AI shouldn't send duplicates anyway
 
@@ -211,34 +218,36 @@ Frameworks: Django, React, TensorFlow, PyTorch
 Cloud: AWS, GCP, Azure
 """
         result = LaTeXGenerator.parse_structured_resume(resume_text)
-        
+
         # Get positions
         positions = {
-            'header': result.find(r'\textbf{\Huge'),
-            'education': result.find(r'\section{Education}'),
-            'skills': result.find(r'\section{Technical Skills}'),
-            'experience': result.find(r'\section{Experience}'),
-            'projects': result.find(r'\section{Projects}'),
+            "header": result.find(r"\textbf{\Huge"),
+            "education": result.find(r"\section{Education}"),
+            "skills": result.find(r"\section{Technical Skills}"),
+            "experience": result.find(r"\section{Experience}"),
+            "projects": result.find(r"\section{Projects}"),
         }
-        
+
         # All sections should exist
         for section, pos in positions.items():
             assert pos != -1, f"{section} section not found in output"
-        
+
         # Verify strict ordering: HEADER -> EDUCATION -> TECHNICAL SKILLS -> EXPERIENCE -> PROJECTS
-        assert positions['header'] < positions['education'], \
-            "Header should come before Education"
-        assert positions['education'] < positions['skills'], \
+        assert positions["header"] < positions["education"], "Header should come before Education"
+        assert positions["education"] < positions["skills"], (
             "Education should come before Technical Skills"
-        assert positions['skills'] < positions['experience'], \
+        )
+        assert positions["skills"] < positions["experience"], (
             "Technical Skills should come before Experience"
-        assert positions['experience'] < positions['projects'], \
+        )
+        assert positions["experience"] < positions["projects"], (
             "Experience should come before Projects"
-        
+        )
+
         # Verify key content is preserved (basic check)
-        assert 'Full Resume' in result
-        assert 'Top University' in result
-        assert 'Elite Institute' in result
-        assert 'Python, Java' in result
-        assert 'Tech Corp' in result
-        assert 'Amazing Project' in result
+        assert "Full Resume" in result
+        assert "Top University" in result
+        assert "Elite Institute" in result
+        assert "Python, Java" in result
+        assert "Tech Corp" in result
+        assert "Amazing Project" in result

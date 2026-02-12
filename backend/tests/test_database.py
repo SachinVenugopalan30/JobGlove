@@ -1,6 +1,8 @@
+
 import pytest
-from datetime import datetime
-from database.db import Resume, ResumeVersion, Score, ReviewBullet
+
+from database.db import Resume, ResumeVersion, ReviewBullet, Score
+
 
 @pytest.mark.unit
 class TestDatabaseModels:

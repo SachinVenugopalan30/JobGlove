@@ -230,28 +230,27 @@ export default function TailorForm({ onComplete }: TailorFormProps) {
           {/* AI Provider Selection */}
           <div>
             <label className="block text-sm font-medium mb-2">AI Provider</label>
-            <div className="flex gap-3">
+            <select
+              value={selectedApi}
+              onChange={(e) => setSelectedApi(e.target.value)}
+              className={cn(
+                "w-full px-4 py-2 rounded-lg border-2 bg-background transition-all capitalize",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary",
+                !selectedApi && "text-muted-foreground"
+              )}
+            >
+              <option value="" disabled>Select an AI provider</option>
               {Object.keys(availableApis).map((api) => (
-                <button
+                <option
                   key={api}
-                  onClick={() => availableApis[api] && setSelectedApi(api)}
+                  value={api}
                   disabled={!availableApis[api]}
-                  className={cn(
-                    'flex-1 py-2 px-4 rounded-lg border-2 transition-all capitalize',
-                    selectedApi === api && availableApis[api]
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-muted hover:border-primary/50',
-                    !availableApis[api] && 'opacity-40 cursor-not-allowed bg-muted/50 hover:border-muted grayscale'
-                  )}
-                  title={!availableApis[api] ? 'API key not configured' : ''}
+                  className="capitalize"
                 >
-                  {api}
-                  {!availableApis[api] && (
-                    <span className="ml-1 text-xs">🔒</span>
-                  )}
-                </button>
+                  {api} {!availableApis[api] && '(Not configured)'}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Error Message */}

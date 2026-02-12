@@ -1,12 +1,13 @@
 import os
+
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 
+from config import Config
+from database.db import init_db
 from routes.health import health_bp
 from routes.resume import resume_bp
-from config import Config
 from utils.logger import app_logger
-from database.db import init_db
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
