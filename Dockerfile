@@ -20,14 +20,8 @@ RUN npm run build
 # Stage 2: Backend with Python
 FROM python:3.11-slim
 
-# Install system dependencies for LaTeX, PDF processing, and curl for health checks
+# Install system dependencies for health checks
 RUN apt-get update && apt-get install -y \
-    texlive-latex-base \
-    texlive-latex-extra \
-    texlive-fonts-recommended \
-    texlive-fonts-extra \
-    texlive-xetex \
-    latexmk \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

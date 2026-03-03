@@ -15,6 +15,9 @@ from groq import Groq
 from config import Config
 from utils.logger import app_logger
 
+# Current year used for estimating open-ended date ranges (e.g. "2022 - Present")
+_CURRENT_YEAR = datetime.now().year
+
 
 class InsufficientCreditsError(Exception):
     """Raised when an API provider rejects a request due to insufficient credits or billing issues"""
@@ -151,6 +154,59 @@ class AIProvider(ABC):
         except Exception as e:
             app_logger.warning(f"Failed to save debug response: {e}")
 
+    @staticmethod
+    def _estimate_years_of_experience(resume_text: str) -> float:
+        """
+        Estimate total years of work experience from date ranges in the resume text.
+
+        Looks for patterns like "Jan 2019 - Mar 2022", "2020 - Present", "2018 - 2021",
+        sums up all non-overlapping durations found, and returns the total in years.
+        Returns 0.0 if no date ranges are detected.
+        """
+        # Match year ranges such as:
+        #   "2018 - 2022", "Jan 2018 - Mar 2022", "January 2018 - Present"
+        pattern = re.compile(
+            r"(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+            r"\s+)?(\d{4})\s*[-–]\s*"
+            r"(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+            r"\s+)?(\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow)",
+            re.IGNORECASE,
+        )
+
+        # Only look inside the EXPERIENCE section to avoid picking up education dates
+        experience_section = resume_text
+        exp_match = re.search(
+            r"\[EXPERIENCE\](.*?)(?=\[(?:EDUCATION|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS)|$)",
+            resume_text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if exp_match:
+            experience_section = exp_match.group(1)
+
+        intervals: list[tuple[int, int]] = []
+        for m in pattern.finditer(experience_section):
+            start_year = int(m.group(1))
+            end_str = m.group(2)
+            end_year = _CURRENT_YEAR if re.match(r"[Pp]resent|[Cc]urrent|[Nn]ow", end_str) else int(end_str)
+            if end_year >= start_year:
+                intervals.append((start_year, end_year))
+
+        if not intervals:
+            return 0.0
+
+        # Merge overlapping intervals to avoid double-counting concurrent roles
+        intervals.sort()
+        merged: list[tuple[int, int]] = [intervals[0]]
+        for start, end in intervals[1:]:
+            if start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+
+        return float(sum(end - start for start, end in merged))
+
     def _create_score_and_tailor_prompt(
         self,
         resume_text: str,
@@ -177,11 +233,40 @@ This score represents the keyword overlap between the resume and job description
 Use this as context when scoring and tailoring the resume.
 """
 
+        # Determine whether to apply single-page constraint
+        years_exp = AIProvider._estimate_years_of_experience(resume_text)
+        single_page_constraint = ""
+        if years_exp < 10:
+            single_page_constraint = """
+[SINGLE-PAGE REQUIREMENT]
+This candidate has fewer than 10 years of work experience. The tailored resume MUST fit on ONE page when rendered.
+
+The PDF renderer uses the following layout — calibrate content length to fit within these constraints:
+- Page size: US Letter (8.5 x 11 in), margins: 0.5 in on all sides → usable area: 7.5 x 10 in
+- Fonts: Helvetica family (no external fonts)
+  - Candidate name: 18 pt bold, centered
+  - Contact line: 7.5 pt, centered (fits roughly 110 characters per line)
+  - Section headers: 11 pt bold uppercase + horizontal rule
+  - Subheading rows (job title / company): 10 pt, two-column table (70% left, 30% right)
+  - Sub-subheading rows (role / dates): 9 pt italic
+  - Bullet points: 9 pt, left indent 16 pt, bullet indent 6 pt
+  - Skills lines: 9 pt
+- Vertical spacing: section spaceBefore=8 pt, spaceAfter=2 pt; subheading spaceAfter=4 pt; bullet spaceAfter=1 pt
+
+To guarantee one-page fit:
+1. Limit each EXPERIENCE entry to a maximum of 3 bullet points (4 only if the entry is the sole or most recent role and there is space)
+2. Each bullet must be a SINGLE sentence of at most 120 characters (including the leading dash and space)
+3. Limit PROJECTS to 2 entries maximum, each with 2 bullet points
+4. If the resume has more than 3 EXPERIENCE entries, include only the 3 most recent/relevant ones
+5. Keep the EDUCATION entry to 2 lines (school + degree/date); omit coursework or GPA unless critical
+6. Do NOT add sections beyond those in the original resume
+"""
+
         return f"""You are an expert resume writer and analyst.
 
 CRITICAL: Section headers MUST use square brackets and ALL CAPS.
 Examples: [EDUCATION], [TECHNICAL SKILLS], [EXPERIENCE], [PROJECTS]
-{similarity_context}
+{similarity_context}{single_page_constraint}
 Your task is to:
 1. Score the original resume against the job description
 2. Tailor the resume to match the job description
