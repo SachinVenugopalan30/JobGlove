@@ -15,9 +15,6 @@ from groq import Groq
 from config import Config
 from utils.logger import app_logger
 
-# Current year used for estimating open-ended date ranges (e.g. "2022 - Present")
-_CURRENT_YEAR = datetime.now().year
-
 
 class InsufficientCreditsError(Exception):
     """Raised when an API provider rejects a request due to insufficient credits or billing issues"""
@@ -197,7 +194,7 @@ class AIProvider(ABC):
         for m in pattern.finditer(experience_section):
             start_year = int(m.group(1))
             end_str = m.group(2)
-            end_year = _CURRENT_YEAR if re.match(r"[Pp]resent|[Cc]urrent|[Nn]ow", end_str) else int(end_str)
+            end_year = datetime.now().year if re.match(r"[Pp]resent|[Cc]urrent|[Nn]ow", end_str) else int(end_str)
             if end_year >= start_year:
                 # Store as exclusive-end so same-year ranges (2023-2023) count as 1 year
                 intervals.append((start_year, end_year + 1))
