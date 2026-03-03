@@ -740,6 +740,14 @@ class LaTeXGenerator:
         return text
 
     @staticmethod
+    def _attr_escape(text: str) -> str:
+        """Escape text for safe use inside XML attribute values (e.g. href="...")."""
+        text = LaTeXGenerator._xml_escape(text)
+        text = text.replace('"', "&quot;")
+        text = text.replace("'", "&#39;")
+        return text
+
+    @staticmethod
     def _finalize_bold_for_pdf(text: str) -> str:
         """
         Convert bold placeholders to reportlab XML markup.
@@ -885,16 +893,17 @@ class LaTeXGenerator:
                     formatted_parts = []
                     for part in contact_parts:
                         part_esc = LaTeXGenerator._xml_escape(part)
+                        part_attr = LaTeXGenerator._attr_escape(part)
                         if "@" in part and "redacted" not in part.lower():
                             formatted_parts.append(
-                                f'<a href="mailto:{part_esc}">'
+                                f'<a href="mailto:{part_attr}">'
                                 f'<font color="#004f90">{part_esc}</font></a>'
                             )
                         elif (
                             "linkedin.com" in part.lower() or "github.com" in part.lower()
                         ) and "redacted" not in part.lower():
                             formatted_parts.append(
-                                f'<a href="{part_esc}">'
+                                f'<a href="{part_attr}">'
                                 f'<font color="#004f90">{part_esc}</font></a>'
                             )
                         else:

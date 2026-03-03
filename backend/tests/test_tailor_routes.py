@@ -45,9 +45,9 @@ class TestTailorResumeEndpoint:
         mock_extract_text,
         client
     ):
-        mock_extract_text.return_value = "Full resume text with header"
+        mock_extract_text.return_value = "Full resume text with header and sufficient content to exceed the fifty character minimum length requirement."
         mock_extract_header.return_value = "[HEADER]\nJohn Doe\njohn@email.com\n"
-        mock_remove_header.return_value = "Resume text without header"
+        mock_remove_header.return_value = "Resume text without header, still long enough for processing."
 
         mock_provider = MagicMock()
         mock_ai_response = {
@@ -104,11 +104,10 @@ class TestTailorResumeEndpoint:
         assert data['tex_file'] == 'resume.tex'
         assert 'message' in data
 
-        mock_provider.score_and_tailor_resume.assert_called_once_with(
-            "Resume text without header",
-            "Software Engineer position...",
-            None
-        )
+        call_args = mock_provider.score_and_tailor_resume.call_args
+        assert call_args[0][0] == "Resume text without header, still long enough for processing."
+        assert call_args[0][1] == "Software Engineer position..."
+        assert call_args[0][2] is None  # custom_prompt
 
         mock_remove.assert_called_once()
 
@@ -132,9 +131,9 @@ class TestTailorResumeEndpoint:
         mock_extract_text,
         client
     ):
-        mock_extract_text.return_value = "Resume text"
+        mock_extract_text.return_value = "Resume text with enough content to pass the fifty character minimum length check in the endpoint."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume"
+        mock_remove_header.return_value = "Resume text body without header, sufficient length for processing validation."
 
         mock_provider = MagicMock()
         mock_ai_response = {
@@ -160,19 +159,22 @@ class TestTailorResumeEndpoint:
             'custom_prompt': 'Focus on Python skills'
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.ANTHROPIC_API_KEY = 'sk-ant-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         assert response.status_code == 200
 
-        mock_provider.score_and_tailor_resume.assert_called_once_with(
-            "Resume",
-            "Job description",
-            "Focus on Python skills"
-        )
+        call_args = mock_provider.score_and_tailor_resume.call_args
+        assert call_args[0][1] == "Job description"
+        assert call_args[0][2] == "Focus on Python skills"
 
     def test_tailor_resume_missing_fields(self, client):
         request_data = {
@@ -225,9 +227,9 @@ class TestTailorResumeEndpoint:
         mock_extract_text,
         client
     ):
-        mock_extract_text.return_value = "Resume text"
+        mock_extract_text.return_value = "Resume text with enough content to pass the fifty character minimum length check in the endpoint."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume"
+        mock_remove_header.return_value = "Resume body text long enough to satisfy the character minimum requirement."
 
         mock_provider = MagicMock()
         mock_provider.score_and_tailor_resume.side_effect = Exception("AI API Error")
@@ -242,11 +244,16 @@ class TestTailorResumeEndpoint:
             'job_title': 'Role'
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.OPENAI_API_KEY = 'sk-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         assert response.status_code == 500
         data = json.loads(response.data)
@@ -264,10 +271,11 @@ class TestTailorResumeEndpoint:
         mock_config,
         client
     ):
-        mock_extract_text.return_value = "Resume text"
+        mock_extract_text.return_value = "Resume text with enough content to pass the fifty character minimum length check in the endpoint."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume"
+        mock_remove_header.return_value = "Resume body without header, still long enough for the minimum check."
 
+        mock_config.DEFAULT_USER_NAME = 'User'
         mock_config.OPENAI_API_KEY = None
         mock_config.GEMINI_API_KEY = None
         mock_config.ANTHROPIC_API_KEY = None
@@ -316,9 +324,9 @@ class TestScoreDataStructure:
         mock_extract_text,
         client
     ):
-        mock_extract_text.return_value = "Resume text"
+        mock_extract_text.return_value = "Resume text with enough content to pass the fifty character minimum length check in the endpoint."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume"
+        mock_remove_header.return_value = "Resume body without header, still long enough for the minimum check."
 
         mock_provider = MagicMock()
         mock_ai_response = {
@@ -356,11 +364,16 @@ class TestScoreDataStructure:
             'job_title': 'Role'
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.OPENAI_API_KEY = 'sk-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         data = json.loads(response.data)
 

@@ -176,7 +176,6 @@ class AIProvider(ABC):
         )
 
         # Only look inside the EXPERIENCE section to avoid picking up education dates
-        experience_section = resume_text
         exp_match = re.search(
             r"\[EXPERIENCE\](.*?)(?=\[(?:EDUCATION|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS)|$)",
             resume_text,
@@ -184,6 +183,15 @@ class AIProvider(ABC):
         )
         if exp_match:
             experience_section = exp_match.group(1)
+        else:
+            # No explicit [EXPERIENCE] tag — truncate at the first non-experience section
+            # header so education/project dates are not counted.
+            trunc_match = re.search(
+                r"\[(?:EDUCATION|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS)\]",
+                resume_text,
+                re.IGNORECASE,
+            )
+            experience_section = resume_text[: trunc_match.start()] if trunc_match else resume_text
 
         intervals: list[tuple[int, int]] = []
         for m in pattern.finditer(experience_section):
@@ -191,7 +199,8 @@ class AIProvider(ABC):
             end_str = m.group(2)
             end_year = _CURRENT_YEAR if re.match(r"[Pp]resent|[Cc]urrent|[Nn]ow", end_str) else int(end_str)
             if end_year >= start_year:
-                intervals.append((start_year, end_year))
+                # Store as exclusive-end so same-year ranges (2023-2023) count as 1 year
+                intervals.append((start_year, end_year + 1))
 
         if not intervals:
             return 0.0

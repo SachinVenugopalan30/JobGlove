@@ -239,7 +239,7 @@ class TestDocumentParserRemoveHeader:
         assert result == ""
 
     def test_remove_header_preserves_rest(self):
-        # No blank-line separator: only the first line is treated as header
+        # Has blank-line separator: both Name and Contact are treated as header
         resume_text = "Name\nContact\n\nEducation\nExperience\nSkills"
 
         result = DocumentParser.remove_header(resume_text)

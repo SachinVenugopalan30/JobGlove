@@ -16,6 +16,7 @@ class TestResumeRoutes:
                 'gemini': False,
                 'claude': True
             }
+            mock_config.DEFAULT_USER_NAME = 'User'
 
             response = client.get('/api/check-apis')
 
@@ -181,8 +182,6 @@ class TestResumeRoutes:
 
             assert response.status_code == 200
 
-    @patch('routes.resume.score_resume_against_job')
-    @patch('routes.resume.extract_text')
     @patch('routes.resume.DocumentParser')
     @patch('routes.resume.AIService')
     @patch('routes.resume.LaTeXGenerator')
@@ -191,42 +190,51 @@ class TestResumeRoutes:
     @patch('routes.resume.os.remove')
     def test_tailor_resume_endpoint_with_new_fields(
         self, mock_remove, mock_exists, mock_get_session,
-        mock_latex, mock_ai, mock_parser, mock_extract_text, mock_score, client
+        mock_latex, mock_ai, mock_parser, client
     ):
         """Test /api/tailor-resume with user_name, company, job_title"""
-        # Setup mocks
-        mock_extract_text.return_value = "John Doe | Senior Software Engineer | Experienced developer with 5+ years in Python, React, and AWS. Built scalable applications."
+        long_text = "John Doe | Senior Software Engineer | Experienced developer with 5+ years in Python, React, and AWS. Built scalable applications."
+        mock_parser.extract_text.return_value = long_text
         mock_parser.extract_header.return_value = "John Doe | john@example.com"
         mock_parser.remove_header.return_value = "Resume without header"
 
+        score_stub = {
+            'total_score': 85,
+            'keyword_match_score': 80,
+            'matched_keywords': [],
+            'missing_keywords': [],
+            'recommendations': [],
+            'ats_issues': [],
+            'quality_issues': [],
+        }
         mock_provider = Mock()
-        mock_provider.tailor_resume.return_value = "Tailored resume"
+        mock_provider.score_and_tailor_resume.return_value = {
+            'original_score': score_stub,
+            'tailored_resume': 'Tailored resume',
+            'tailored_score': score_stub,
+        }
         mock_ai.get_provider.return_value = mock_provider
 
         mock_latex.generate_latex.return_value = ('/path/to/resume.pdf', '/path/to/resume.tex')
-
-        mock_score.return_value = {
-            'total_score': 85,
-            'keyword_match_score': 80,
-            'keyword_match_details': {'matched': [], 'missing': [], 'match_percentage': 80},
-            'relevance_score': 90,
-            'ats_score': 85,
-            'quality_score': 85,
-            'recommendations': []
-        }
 
         mock_session = Mock()
         mock_get_session.return_value = mock_session
         mock_exists.return_value = True
 
-        response = client.post('/api/tailor-resume', json={
-            'file_path': '/tmp/test.docx',
-            'job_description': 'Job description',
-            'api': 'openai',
-            'user_name': 'John Doe',
-            'company': 'Tech Corp',
-            'job_title': 'Software Engineer'
-        })
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.OPENAI_API_KEY = 'sk-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+
+            response = client.post('/api/tailor-resume', json={
+                'file_path': '/tmp/test.docx',
+                'job_description': 'Job description',
+                'api': 'openai',
+                'user_name': 'John Doe',
+                'company': 'Tech Corp',
+                'job_title': 'Software Engineer'
+            })
 
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -234,47 +242,52 @@ class TestResumeRoutes:
         assert 'tex_file' in data
         assert 'tailored_score' in data
 
-        # Verify LaTeX generator was called with user info
         mock_latex.generate_latex.assert_called_once()
         call_args = mock_latex.generate_latex.call_args
-        # Check that user_name, company, job_title were passed
-        assert 'John Doe' in str(call_args) or call_args[1].get('user_name') == 'John Doe'
+        assert 'John Doe' in str(call_args)
 
-    @patch('routes.resume.score_resume_against_job')
-    @patch('routes.resume.extract_text')
     @patch('routes.resume.DocumentParser')
     @patch('routes.resume.AIService')
     @patch('routes.resume.LaTeXGenerator')
     @patch('routes.resume.get_session')
     def test_tailor_resume_saves_to_database(
-        self, mock_get_session, mock_latex, mock_ai, mock_parser, mock_extract_text, mock_score, client
+        self, mock_get_session, mock_latex, mock_ai, mock_parser, client
     ):
         """Test that /api/tailor-resume saves data to database"""
-        mock_extract_text.return_value = "Test User | Senior Developer | Experienced in software development with proven track record. Proficient in multiple technologies."
+        long_text = "Test User | Senior Developer | Experienced in software development with proven track record. Proficient in multiple technologies."
+        mock_parser.extract_text.return_value = long_text
         mock_parser.extract_header.return_value = "Header"
         mock_parser.remove_header.return_value = "Body"
 
+        score_stub = {
+            'total_score': 85,
+            'keyword_match_score': 80,
+            'matched_keywords': [],
+            'missing_keywords': [],
+            'recommendations': [],
+            'ats_issues': [],
+            'quality_issues': [],
+        }
         mock_provider = Mock()
-        mock_provider.tailor_resume.return_value = "Tailored"
+        mock_provider.score_and_tailor_resume.return_value = {
+            'original_score': score_stub,
+            'tailored_resume': 'Tailored',
+            'tailored_score': score_stub,
+        }
         mock_ai.get_provider.return_value = mock_provider
 
         mock_latex.generate_latex.return_value = ('/test.pdf', '/test.tex')
-
-        mock_score.return_value = {
-            'total_score': 85,
-            'keyword_match_score': 80,
-            'keyword_match_details': {'matched': [], 'missing': [], 'match_percentage': 80},
-            'relevance_score': 90,
-            'ats_score': 85,
-            'quality_score': 85,
-            'recommendations': []
-        }
 
         mock_session = Mock()
         mock_get_session.return_value = mock_session
 
         with patch('routes.resume.os.path.exists', return_value=True), \
-             patch('routes.resume.os.remove'):
+             patch('routes.resume.os.remove'), \
+             patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.GEMINI_API_KEY = 'gm-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
 
             response = client.post('/api/tailor-resume', json={
                 'file_path': '/tmp/test.docx',
@@ -287,6 +300,5 @@ class TestResumeRoutes:
 
             assert response.status_code == 200
 
-            # Verify database operations were called
             assert mock_session.add.called
             assert mock_session.commit.called
