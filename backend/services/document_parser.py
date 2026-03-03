@@ -17,11 +17,19 @@ class DocumentParser:
         header_lines: list[str] = []
         body_lines: list[str] = []
 
-        # Find the first blank line that separates header from body
+        # Ignore leading blank lines, then collect header until the first blank
+        # line that follows at least one non-empty header line.
+        header_started = False
         blank_found = False
         for line in raw_lines:
             stripped = line.strip()
-            if not blank_found:
+            if not header_started:
+                # Skip leading blank lines before the header block begins
+                if stripped == '':
+                    continue
+                header_started = True
+                header_lines.append(stripped)
+            elif not blank_found:
                 if stripped == '':
                     blank_found = True
                 else:
@@ -29,7 +37,7 @@ class DocumentParser:
             else:
                 body_lines.append(line)
 
-        # No blank line found: treat only the very first non-empty line as the header
+        # No blank separator found: treat only the first non-empty line as header
         if not blank_found and len(header_lines) > 1:
             body_lines = header_lines[1:]
             header_lines = header_lines[:1]

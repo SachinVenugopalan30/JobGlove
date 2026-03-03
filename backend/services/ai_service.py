@@ -262,6 +262,32 @@ To guarantee one-page fit:
 6. Do NOT add sections beyond those in the original resume
 """
 
+        # Bullet-count limits — single-page branch is authoritative when active
+        if years_exp < 10:
+            exp_bullet_rule = (
+                "- Each EXPERIENCE entry: maximum 3 bullet points "
+                "(4 only for the single or most-recent role if space permits)"
+            )
+            exp_condense_rule = (
+                "- If original has more than 3 points, condense to the 3 most impactful"
+            )
+            project_bullet_rule = "- Bullet points (2 bullets per project)"
+            req_exp_bullets = "3. Each EXPERIENCE entry MUST have exactly 3 bullet points (4 only for the most-recent role if space allows)"
+            req_proj_bullets = "4. Each PROJECT entry MUST have exactly 2 bullet points"
+            req_education = "5. EDUCATION: 2 lines only (school + degree/date) — omit GPA and coursework"
+        else:
+            exp_bullet_rule = (
+                "- Each EXPERIENCE entry: 3–5 bullet points"
+            )
+            exp_condense_rule = (
+                "- If original has more than 5 points, condense the most impactful achievements into 5 points\n"
+                "- If original has fewer than 3 points, expand with relevant details"
+            )
+            project_bullet_rule = "- Bullet points (2-4 points per project)"
+            req_exp_bullets = "3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)"
+            req_proj_bullets = "4. Each PROJECT entry should have 2-4 bullet points"
+            req_education = "5. EDUCATION: include relevant details as in the original resume"
+
         return f"""You are an expert resume writer and analyst.
 
 CRITICAL: Section headers MUST use square brackets and ALL CAPS.
@@ -318,13 +344,13 @@ Company Name | Location
 - Bullet points starting with "-"
 
 BULLET POINT REQUIREMENTS:
-- Each bullet point should be 1–2 lines long and max 1 sentence long
-- If original resume has more than 5 points, condense the most impactful achievements into 5 points
-- If original resume has fewer than 3 points, expand with relevant details
-- Don’t let bullets spill onto the next line with only 1–4 words on it, it’s a huge waste of space
+{exp_bullet_rule}
+{exp_condense_rule}
+- Each bullet point should be 1 sentence, max 120 characters (including the leading "- ")
+- Don't let bullets spill onto the next line with only 1–4 words on it, it's a huge waste of space
 - Each bullet point should comprise of either of the following ideologies - STAR: Situation Task Action Result,  XYZ: Accomplished X as measured by Y by doing Z or CAR: Challenge Action Result.
 - Provide context and incorporate relevant keywords. This helps the hiring team understand and relate to your work and technical achievements
-- Avoid adding unnecessary information that doesn’t add to your candidacy
+- Avoid adding unnecessary information that doesn't add to your candidacy
 - Bullet points should be ordered from most relevant/impressive to least, as some hiring managers only have time to read the first they should get THE BEST!
 - Research Action Verbs - Analyzed, Applied, Checked, Cited, Clarified, Collected, Compared, Critiqued, Deducted, Determined, Diagnosed, Discovered, Dissected, Estimated, Evaluated, Examined, Explored, Extracted, Forecasted, Formulated, Found, Gathered, Graphed, Identified, Inspected, Interpreted, Interviewed, Investigated, Isolated, Located, Observed, Predicted, Read,Researched, Reviewed, Studied, Summarized, Surveyed, Systematized
 - Technical Action Verbs - Adjusted, Advanced, Altered, Amplified, Assembled, Built, Calculated, Computed, Designed, Devised, Developed, Engineered, Excavated, Extrapolated, Fabricated, Installed, Interpreted, Maintained, Mapped, Measured, Mediated, Moderated, Motivated, Negotiated, Obtained, Operated, Overhauled, Persuaded, Plotted, Produced, Programmed, Promoted, Publicized, Reconciled, Recruited, Remodeled, Renovated, Repaired, Restored, Rotated, Solved, Synthesized, Translated, Upgraded, Wrote
@@ -346,21 +372,22 @@ WRONG: Company first, or single line with 4 parts.
 [PROJECTS]
 Project Name | Tech Stack
 Date Range
-- Bullet points (2-4 points per project)
+{project_bullet_rule}
 
 REQUIREMENTS:
 1. PRESERVE SKILLS section exactly as in original resume
 2. For EXPERIENCE/PROJECTS: Reframe to align with job description
-3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)
-4. Each PROJECT entry should have 2-4 bullet points
-5. DO NOT over-exaggerate achievements.
-6. Use "Accomplished X through Y using Z" template for bullets
-7. Use action verbs and quantify achievements (avoid repeating verbs)
-8. Use plain text - DO NOT escape special characters (%, &, $, #)
-9. Maintain professional tone and consistent tense
-10. SECTION ORDER: Output sections in this exact order: EDUCATION, TECHNICAL SKILLS, EXPERIENCE, PROJECTS
-11. Do NOT add sections that do not exist in the original resume
-{f"12. {base_instructions}" if base_instructions else ""}
+{req_exp_bullets}
+{req_proj_bullets}
+{req_education}
+6. DO NOT over-exaggerate achievements.
+7. Use "Accomplished X through Y using Z" template for bullets
+8. Use action verbs and quantify achievements (avoid repeating verbs)
+9. Use plain text - DO NOT escape special characters (%, &, $, #)
+10. Maintain professional tone and consistent tense
+11. SECTION ORDER: Output sections in this exact order: EDUCATION, TECHNICAL SKILLS, EXPERIENCE, PROJECTS
+12. Do NOT add sections that do not exist in the original resume
+{f"13. {base_instructions}" if base_instructions else ""}
 
 Original Resume:
 {resume_text}

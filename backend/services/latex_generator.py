@@ -1120,7 +1120,7 @@ class LaTeXGenerator:
                     if ln.strip() and not ln.strip().startswith("(")
                 ]
                 has_content = any(
-                    "|" in ln for ln in proj_lines if not ln.startswith("-")
+                    not ln.startswith("-") for ln in proj_lines
                 )
                 if not has_content:
                     continue
@@ -1130,30 +1130,42 @@ class LaTeXGenerator:
                     HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
                 )
 
-                date_pattern = (
-                    r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Present|Current)"
-                )
                 i = 0
                 while i < len(proj_lines):
-                    if "|" in proj_lines[i] and not proj_lines[i].startswith("-"):
+                    if not proj_lines[i].startswith("-"):
                         parts = [p.strip() for p in proj_lines[i].split("|")]
                         project_name = parts[0]
                         date_str = ""
+                        tech_stack = ""
 
-                        if len(parts) == 3 and re.search(
-                            r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
-                            r"|Present|Current)|^(?:N/?A|NA|None|TBD)$",
-                            parts[2].strip(),
-                            re.IGNORECASE,
-                        ):
-                            tech_stack = parts[1]
-                            raw_date = LaTeXGenerator._sanitize_date(parts[2])
-                            date_str = raw_date
-                            i += 1
+                        if len(parts) >= 2:
+                            # Pipe-delimited header: "Name | Stack" or "Name | Stack | Date"
+                            if len(parts) == 3 and re.search(
+                                r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+                                r"|Present|Current)|^(?:N/?A|NA|None|TBD)$",
+                                parts[2].strip(),
+                                re.IGNORECASE,
+                            ):
+                                tech_stack = parts[1]
+                                raw_date = LaTeXGenerator._sanitize_date(parts[2])
+                                date_str = raw_date
+                            else:
+                                tech_stack = " | ".join(parts[1:])
+                                # Check if the next non-bullet line is a date
+                                i += 1
+                                if (
+                                    i < len(proj_lines)
+                                    and not proj_lines[i].startswith("-")
+                                    and "|" not in proj_lines[i]
+                                ):
+                                    raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
+                                    date_str = raw_date
+                                else:
+                                    # Next line is a bullet or another header; don't consume it
+                                    i -= 1
                         else:
-                            tech_stack = " | ".join(parts[1:])
+                            # Plain header with no pipe: next non-bullet line may be a date
                             i += 1
-                            # Check if next non-bullet line is a date
                             if (
                                 i < len(proj_lines)
                                 and not proj_lines[i].startswith("-")
@@ -1161,13 +1173,18 @@ class LaTeXGenerator:
                             ):
                                 raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
                                 date_str = raw_date
-                                i += 1
+                            else:
+                                i -= 1
+
+                        i += 1
 
                         proj_esc = LaTeXGenerator._xml_escape(project_name)
                         tech_esc = LaTeXGenerator._xml_escape(tech_stack)
                         date_esc = LaTeXGenerator._xml_escape(date_str)
 
-                        header_text = f"<b>{proj_esc}</b> | <i>{tech_esc}</i>"
+                        header_text = f"<b>{proj_esc}</b>"
+                        if tech_esc:
+                            header_text += f" | <i>{tech_esc}</i>"
                         proj_row = Table(
                             [[
                                 Paragraph(header_text, subheading_left_style),
