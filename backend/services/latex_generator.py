@@ -849,6 +849,8 @@ class LaTeXGenerator:
 
         # Parse sections from structured text
         normalized = LaTeXGenerator._normalize_section_headers(resume_text)
+        # Normalize line endings so section splitting works for \n, \r\n, and \r inputs
+        normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
         raw_sections = re.split(r"(?:^|\n)\[([A-Z\s]+)\]\n", normalized, flags=re.MULTILINE)
 
         section_dict = {}
