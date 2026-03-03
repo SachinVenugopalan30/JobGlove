@@ -1139,6 +1139,12 @@ class LaTeXGenerator:
                     HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
                 )
 
+                _date_pat = re.compile(
+                    r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+                    r"|Present|Current)|^(?:N/?A|NA|None|TBD)$",
+                    re.IGNORECASE,
+                )
+
                 i = 0
                 while i < len(proj_lines):
                     if not proj_lines[i].startswith("-"):
@@ -1149,12 +1155,7 @@ class LaTeXGenerator:
 
                         if len(parts) >= 2:
                             # Pipe-delimited header: "Name | Stack" or "Name | Stack | Date"
-                            if len(parts) == 3 and re.search(
-                                r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
-                                r"|Present|Current)|^(?:N/?A|NA|None|TBD)$",
-                                parts[2].strip(),
-                                re.IGNORECASE,
-                            ):
+                            if len(parts) == 3 and _date_pat.search(parts[2].strip()):
                                 tech_stack = parts[1]
                                 raw_date = LaTeXGenerator._sanitize_date(parts[2])
                                 date_str = raw_date
@@ -1166,6 +1167,7 @@ class LaTeXGenerator:
                                     i < len(proj_lines)
                                     and not proj_lines[i].startswith("-")
                                     and "|" not in proj_lines[i]
+                                    and _date_pat.search(proj_lines[i])
                                 ):
                                     raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
                                     date_str = raw_date
@@ -1179,6 +1181,7 @@ class LaTeXGenerator:
                                 i < len(proj_lines)
                                 and not proj_lines[i].startswith("-")
                                 and "|" not in proj_lines[i]
+                                and _date_pat.search(proj_lines[i])
                             ):
                                 raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
                                 date_str = raw_date
