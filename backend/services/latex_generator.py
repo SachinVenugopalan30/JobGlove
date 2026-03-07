@@ -1,7 +1,20 @@
 import os
 import re
-import subprocess
 import uuid
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    HRFlowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from utils.logger import app_logger
 
@@ -272,12 +285,12 @@ class LaTeXGenerator:
             # Check original (unescaped) for special handling
             if "@" in part and "redacted" not in part.lower():
                 # Real email - make it a hyperlink
-                formatted_parts.append(f"\\href{{mailto:{part}}}{{\\underline{{{part_escaped}}}}}")
+                formatted_parts.append(f"\\href{{mailto:{part}}}{{\\textcolor{{customblue}}{{{part_escaped}}}}}")
             elif (
                 "linkedin.com" in part.lower() or "github.com" in part.lower()
             ) and "redacted" not in part.lower():
                 # Real link - make it a hyperlink
-                formatted_parts.append(f"\\href{{{part}}}{{\\underline{{{part_escaped}}}}}")
+                formatted_parts.append(f"\\href{{{part}}}{{\\textcolor{{customblue}}{{{part_escaped}}}}}")
             else:
                 # Plain text (including REDACTED values)
                 formatted_parts.append(part_escaped)
@@ -719,6 +732,501 @@ class LaTeXGenerator:
         return sections
 
     @staticmethod
+    def _xml_escape(text: str) -> str:
+        """Escape XML special characters for reportlab Paragraph markup."""
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        return text
+
+    @staticmethod
+    def _attr_escape(text: str) -> str:
+        """Escape text for safe use inside XML attribute values (e.g. href="...")."""
+        text = LaTeXGenerator._xml_escape(text)
+        text = text.replace('"', "&quot;")
+        text = text.replace("'", "&#39;")
+        return text
+
+    @staticmethod
+    def _finalize_bold_for_pdf(text: str) -> str:
+        """
+        Convert bold placeholders to reportlab XML markup.
+        Applies XML escaping to surrounding text while wrapping metrics in <b> tags.
+        """
+        parts = re.split(r"<<<BOLD_START>>>(.*?)<<<BOLD_END>>>", text)
+        result = []
+        for i, part in enumerate(parts):
+            if i % 2 == 0:
+                # Regular text — XML-escape it
+                result.append(LaTeXGenerator._xml_escape(part))
+            else:
+                # Bold content — XML-escape the content inside <b>
+                result.append(f"<b>{LaTeXGenerator._xml_escape(part)}</b>")
+        return "".join(result)
+
+    @staticmethod
+    def _generate_pdf_with_reportlab(resume_text: str, pdf_path: str) -> None:
+        """
+        Generate a PDF resume from structured resume text using reportlab.
+        Parses sections in fixed order: HEADER, EDUCATION, TECHNICAL SKILLS/SKILLS,
+        EXPERIENCE, PROJECTS.
+        """
+        margin = 0.5 * inch
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=letter,
+            leftMargin=margin,
+            rightMargin=margin,
+            topMargin=margin,
+            bottomMargin=margin,
+        )
+        content_width = letter[0] - 2 * margin
+
+        # Define paragraph styles
+        name_style = ParagraphStyle(
+            "Name",
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            leading=22,
+            alignment=TA_CENTER,
+            spaceAfter=4,
+        )
+        contact_style = ParagraphStyle(
+            "Contact",
+            fontName="Helvetica",
+            fontSize=7.5,
+            leading=10,
+            alignment=TA_CENTER,
+            spaceAfter=8,
+            wordWrap="LTR",
+        )
+        section_header_style = ParagraphStyle(
+            "SectionHeader",
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            alignment=TA_LEFT,
+            spaceBefore=8,
+            spaceAfter=2,
+            textTransform="uppercase",
+        )
+        subheading_left_style = ParagraphStyle(
+            "SubheadingLeft",
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            alignment=TA_LEFT,
+        )
+        subheading_right_style = ParagraphStyle(
+            "SubheadingRight",
+            fontName="Helvetica",
+            fontSize=10,
+            alignment=TA_RIGHT,
+        )
+        subheading_left_plain_style = ParagraphStyle(
+            "SubheadingLeftPlain",
+            fontName="Helvetica-Oblique",
+            fontSize=9,
+            alignment=TA_LEFT,
+        )
+        bullet_style = ParagraphStyle(
+            "Bullet",
+            fontName="Helvetica",
+            fontSize=9,
+            leftIndent=16,
+            firstLineIndent=0,
+            spaceAfter=1,
+            bulletText="\u2022",
+            bulletIndent=6,
+            bulletFontName="Helvetica",
+            bulletFontSize=9,
+        )
+        skills_style = ParagraphStyle(
+            "Skills",
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=TA_LEFT,
+            spaceAfter=2,
+        )
+
+        # Parse sections from structured text
+        normalized = LaTeXGenerator._normalize_section_headers(resume_text)
+        # Normalize line endings so section splitting works for \n, \r\n, and \r inputs
+        normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+        raw_sections = re.split(r"(?:^|\n)\[([A-Z\s]+)\]\n", normalized, flags=re.MULTILINE)
+
+        section_dict = {}
+        current_section = None
+        for i, part in enumerate(raw_sections):
+            if i == 0:
+                continue
+            if i % 2 == 1:
+                current_section = part.strip()
+            else:
+                section_dict[current_section] = part.strip()
+
+        ordered_sections = [
+            "HEADER",
+            "EDUCATION",
+            "TECHNICAL SKILLS",
+            "SKILLS",
+            "EXPERIENCE",
+            "PROJECTS",
+        ]
+
+        story = []
+        skills_added = False
+
+        for section_name in ordered_sections:
+            if section_name not in section_dict:
+                continue
+
+            content = section_dict[section_name]
+            lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
+
+            if section_name == "HEADER":
+                if not lines:
+                    continue
+                # Name
+                name = LaTeXGenerator._xml_escape(lines[0])
+                story.append(Paragraph(f"<b>{name}</b>", name_style))
+
+                if len(lines) >= 2:
+                    # Contact line — pipe-separated
+                    contact_parts = [p.strip() for p in lines[1].split("|")]
+                    formatted_parts = []
+                    for part in contact_parts:
+                        part_esc = LaTeXGenerator._xml_escape(part)
+                        part_attr = LaTeXGenerator._attr_escape(part)
+                        if "@" in part and "redacted" not in part.lower():
+                            formatted_parts.append(
+                                f'<a href="mailto:{part_attr}">'
+                                f'<font color="#004f90">{part_esc}</font></a>'
+                            )
+                        elif (
+                            "linkedin.com" in part.lower() or "github.com" in part.lower()
+                        ) and "redacted" not in part.lower():
+                            formatted_parts.append(
+                                f'<a href="{part_attr}">'
+                                f'<font color="#004f90">{part_esc}</font></a>'
+                            )
+                        else:
+                            formatted_parts.append(part_esc)
+                    contact_line = " | ".join(formatted_parts)
+                    story.append(Paragraph(contact_line, contact_style))
+
+            elif section_name == "EDUCATION":
+                edu_lines = [
+                    ln.strip()
+                    for ln in content.split("\n")
+                    if ln.strip() and not ln.strip().startswith("(")
+                ]
+                has_content = any("|" in ln for ln in edu_lines)
+                if not has_content:
+                    continue
+
+                story.append(Paragraph("Education", section_header_style))
+                story.append(
+                    HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
+                )
+
+                i = 0
+                while i < len(edu_lines):
+                    if "|" in edu_lines[i]:
+                        parts = [p.strip() for p in edu_lines[i].split("|")]
+                        if len(parts) == 2:
+                            school, location = parts
+                            if i + 1 < len(edu_lines) and "|" in edu_lines[i + 1]:
+                                degree_parts = [p.strip() for p in edu_lines[i + 1].split("|")]
+                                if len(degree_parts) == 2:
+                                    degree, date = degree_parts
+                                    row1 = Table(
+                                        [[
+                                            Paragraph(
+                                                LaTeXGenerator._xml_escape(school),
+                                                subheading_left_style,
+                                            ),
+                                            Paragraph(
+                                                LaTeXGenerator._xml_escape(location),
+                                                subheading_right_style,
+                                            ),
+                                        ]],
+                                        colWidths=[content_width * 0.70, content_width * 0.30],
+                                    )
+                                    row1.setStyle(
+                                        TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1)])
+                                    )
+                                    row2 = Table(
+                                        [[
+                                            Paragraph(
+                                                f"<i>{LaTeXGenerator._xml_escape(degree)}</i>",
+                                                subheading_left_plain_style,
+                                            ),
+                                            Paragraph(
+                                                LaTeXGenerator._xml_escape(date),
+                                                subheading_right_style,
+                                            ),
+                                        ]],
+                                        colWidths=[content_width * 0.70, content_width * 0.30],
+                                    )
+                                    row2.setStyle(
+                                        TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4)])
+                                    )
+                                    story.append(row1)
+                                    story.append(row2)
+                                    i += 2
+                                    continue
+                    i += 1
+
+            elif section_name in ("TECHNICAL SKILLS", "SKILLS"):
+                if skills_added:
+                    continue
+                skill_lines = [
+                    ln.strip() for ln in content.split("\n") if ln.strip() and ":" in ln
+                ]
+                if not skill_lines:
+                    continue
+
+                story.append(Paragraph("Technical Skills", section_header_style))
+                story.append(
+                    HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
+                )
+
+                for ln in skill_lines:
+                    if ":" in ln:
+                        cat, rest = ln.split(":", 1)
+                        cat_esc = LaTeXGenerator._xml_escape(cat.strip())
+                        rest_esc = LaTeXGenerator._xml_escape(rest.strip())
+                        story.append(
+                            Paragraph(f"<b>{cat_esc}:</b> {rest_esc}", skills_style)
+                        )
+
+                skills_added = True
+
+            elif section_name == "EXPERIENCE":
+                exp_lines = [
+                    ln.strip()
+                    for ln in content.split("\n")
+                    if ln.strip() and not ln.strip().startswith("(")
+                ]
+                has_content = any("|" in ln for ln in exp_lines if not ln.startswith("-"))
+                if not has_content:
+                    continue
+
+                story.append(Paragraph("Experience", section_header_style))
+                story.append(
+                    HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
+                )
+
+                date_pattern = (
+                    r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Present|Current)"
+                )
+                i = 0
+                while i < len(exp_lines):
+                    if "|" in exp_lines[i] and not exp_lines[i].startswith("-"):
+                        parts = [p.strip() for p in exp_lines[i].split("|")]
+
+                        if len(parts) == 4:
+                            title, company, location, date = parts
+                        elif len(parts) == 3:
+                            if re.search(date_pattern, parts[2], re.IGNORECASE):
+                                title, company, date = parts
+                                location = ""
+                            else:
+                                title, company, location = parts
+                                date = ""
+                        elif len(parts) == 2:
+                            first_p1, first_p2 = parts
+                            if (
+                                i + 1 < len(exp_lines)
+                                and "|" in exp_lines[i + 1]
+                                and not exp_lines[i + 1].startswith("-")
+                            ):
+                                second_parts = [p.strip() for p in exp_lines[i + 1].split("|")]
+                                if len(second_parts) == 2:
+                                    second_p1, second_p2 = second_parts
+                                    if re.search(date_pattern, first_p2, re.IGNORECASE):
+                                        title, date, company, location = (
+                                            first_p1, first_p2, second_p1, second_p2
+                                        )
+                                    else:
+                                        company, location, title, date = (
+                                            first_p1, first_p2, second_p1, second_p2
+                                        )
+                                    i += 1
+                                else:
+                                    title, date = first_p1, first_p2
+                                    company, location = "", ""
+                            else:
+                                if re.search(date_pattern, first_p2, re.IGNORECASE):
+                                    title, date = first_p1, first_p2
+                                    company, location = "", ""
+                                else:
+                                    title, date = first_p1, ""
+                                    company, location = "", first_p2
+                        else:
+                            i += 1
+                            continue
+
+                        row1 = Table(
+                            [[
+                                Paragraph(
+                                    f"<b>{LaTeXGenerator._xml_escape(title)}</b>",
+                                    subheading_left_style,
+                                ),
+                                Paragraph(
+                                    LaTeXGenerator._xml_escape(date),
+                                    subheading_right_style,
+                                ),
+                            ]],
+                            colWidths=[content_width * 0.70, content_width * 0.30],
+                        )
+                        row1.setStyle(
+                            TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                        ("BOTTOMPADDING", (0, 0), (-1, -1), 1)])
+                        )
+                        row2 = Table(
+                            [[
+                                Paragraph(
+                                    f"<i>{LaTeXGenerator._xml_escape(company)}</i>",
+                                    subheading_left_plain_style,
+                                ),
+                                Paragraph(
+                                    LaTeXGenerator._xml_escape(location),
+                                    subheading_right_style,
+                                ),
+                            ]],
+                            colWidths=[content_width * 0.70, content_width * 0.30],
+                        )
+                        row2.setStyle(
+                            TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2)])
+                        )
+                        story.append(row1)
+                        story.append(row2)
+
+                        i += 1
+                        while i < len(exp_lines) and exp_lines[i].startswith("-"):
+                            bullet = exp_lines[i][1:].strip()
+                            bullet_bold = LaTeXGenerator.bold_metrics(bullet)
+                            bullet_text = LaTeXGenerator._finalize_bold_for_pdf(bullet_bold)
+                            story.append(Paragraph(bullet_text, bullet_style))
+                            i += 1
+                        story.append(Spacer(1, 4))
+                        continue
+                    i += 1
+
+            elif section_name == "PROJECTS":
+                proj_lines = [
+                    ln.strip()
+                    for ln in content.split("\n")
+                    if ln.strip() and not ln.strip().startswith("(")
+                ]
+                has_content = any(
+                    not ln.startswith("-") for ln in proj_lines
+                )
+                if not has_content:
+                    continue
+
+                story.append(Paragraph("Projects", section_header_style))
+                story.append(
+                    HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceAfter=4)
+                )
+
+                _date_pat = re.compile(
+                    r"\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+                    r"|Present|Current)|^(?:N/?A|NA|None|TBD)$",
+                    re.IGNORECASE,
+                )
+
+                i = 0
+                while i < len(proj_lines):
+                    if not proj_lines[i].startswith("-"):
+                        parts = [p.strip() for p in proj_lines[i].split("|")]
+                        project_name = parts[0]
+                        date_str = ""
+                        tech_stack = ""
+
+                        if len(parts) >= 2:
+                            # Pipe-delimited header: "Name | Stack" or "Name | Stack | Date"
+                            if len(parts) == 3 and _date_pat.search(parts[2].strip()):
+                                tech_stack = parts[1]
+                                raw_date = LaTeXGenerator._sanitize_date(parts[2])
+                                date_str = raw_date
+                            else:
+                                tech_stack = " | ".join(parts[1:])
+                                # Check if the next non-bullet line is a date
+                                i += 1
+                                if (
+                                    i < len(proj_lines)
+                                    and not proj_lines[i].startswith("-")
+                                    and "|" not in proj_lines[i]
+                                    and _date_pat.search(proj_lines[i])
+                                ):
+                                    raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
+                                    date_str = raw_date
+                                else:
+                                    # Next line is a bullet or another header; don't consume it
+                                    i -= 1
+                        else:
+                            # Plain header with no pipe: next non-bullet line may be a date
+                            i += 1
+                            if (
+                                i < len(proj_lines)
+                                and not proj_lines[i].startswith("-")
+                                and "|" not in proj_lines[i]
+                                and _date_pat.search(proj_lines[i])
+                            ):
+                                raw_date = LaTeXGenerator._sanitize_date(proj_lines[i])
+                                date_str = raw_date
+                            else:
+                                i -= 1
+
+                        i += 1
+
+                        proj_esc = LaTeXGenerator._xml_escape(project_name)
+                        tech_esc = LaTeXGenerator._xml_escape(tech_stack)
+                        date_esc = LaTeXGenerator._xml_escape(date_str)
+
+                        header_text = f"<b>{proj_esc}</b>"
+                        if tech_esc:
+                            header_text += f" | <i>{tech_esc}</i>"
+                        proj_row = Table(
+                            [[
+                                Paragraph(header_text, subheading_left_style),
+                                Paragraph(date_esc, subheading_right_style),
+                            ]],
+                            colWidths=[content_width * 0.70, content_width * 0.30],
+                        )
+                        proj_row.setStyle(
+                            TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2)])
+                        )
+                        story.append(proj_row)
+
+                        while i < len(proj_lines) and proj_lines[i].startswith("-"):
+                            bullet = proj_lines[i][1:].strip()
+                            bullet_bold = LaTeXGenerator.bold_metrics(bullet)
+                            bullet_text = LaTeXGenerator._finalize_bold_for_pdf(bullet_bold)
+                            story.append(Paragraph(bullet_text, bullet_style))
+                            i += 1
+                        story.append(Spacer(1, 4))
+                        continue
+                    i += 1
+
+        doc.build(story)
+
+    @staticmethod
     def generate_latex(
         resume_text: str,
         template_path: str,
@@ -786,45 +1294,17 @@ class LaTeXGenerator:
             with open(tex_file, "w") as f:
                 f.write(latex_content)
 
-            # Compile LaTeX to PDF (run twice for proper cross-references)
-            app_logger.info(f"Compiling LaTeX file: {filename}.tex")
-            for _ in range(2):
-                result = subprocess.run(
-                    [
-                        "pdflatex",
-                        "-interaction=nonstopmode",
-                        "-output-directory",
-                        output_dir,
-                        tex_file,
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-
-            if result.returncode != 0 and not os.path.exists(pdf_file):
-                app_logger.error(f"LaTeX compilation failed for {filename}.tex")
-                error_log = result.stdout or result.stderr
-                raise Exception(f"LaTeX compilation failed: {error_log}")
-            elif result.returncode != 0:
-                app_logger.warning(f"LaTeX compiled with warnings for {filename}.tex")
-
-            # Clean up auxiliary files (keep .tex for debugging)
-            for ext in [".aux", ".log", ".out"]:
-                aux_file = os.path.join(output_dir, f"{filename}{ext}")
-                if os.path.exists(aux_file):
-                    os.remove(aux_file)
+            # Generate PDF using pure-Python reportlab (works on any OS)
+            app_logger.info(f"Generating PDF: {filename}.pdf")
+            LaTeXGenerator._generate_pdf_with_reportlab(resume_text, pdf_file)
 
             if not os.path.exists(pdf_file):
                 app_logger.error(f"PDF file was not generated for {filename}")
                 raise Exception("PDF file was not generated")
 
-            app_logger.info(f"LaTeX compilation successful: {filename}.pdf")
+            app_logger.info(f"PDF generated successfully: {filename}.pdf")
             return pdf_file, tex_file
 
-        except subprocess.TimeoutExpired:
-            app_logger.error(f"LaTeX compilation timed out for {filename}.tex")
-            raise Exception("LaTeX compilation timed out")
         except Exception as e:
             app_logger.error(f"Error generating PDF: {str(e)}")
             raise Exception(f"Error generating PDF: {str(e)}")

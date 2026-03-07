@@ -280,6 +280,7 @@ class TestGeminiProviderScoreAndTailor:
 class TestClaudeProviderScoreAndTailor:
     """Test Claude provider score_and_tailor_resume method"""
 
+    @patch("services.ai_service.Config.CLAUDE_MODEL", "claude-sonnet-4-6")
     @patch("services.ai_service.anthropic.Anthropic")
     def test_score_and_tailor_success(self, mock_anthropic_class):
         mock_client = MagicMock()
@@ -320,7 +321,7 @@ class TestClaudeProviderScoreAndTailor:
 
         mock_client.messages.create.assert_called_once()
         call_args = mock_client.messages.create.call_args
-        assert call_args.kwargs["model"] == "claude-haiku-4-5-20251001"
+        assert call_args.kwargs["model"] == "claude-sonnet-4-6"
         assert call_args.kwargs["max_tokens"] == 4000
 
     @patch("services.ai_service.anthropic.Anthropic")

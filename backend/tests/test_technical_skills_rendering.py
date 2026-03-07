@@ -85,9 +85,9 @@ Role | 2020-2023
 
         latex_output = LaTeXGenerator.parse_structured_resume(resume)
 
-        # Both should be rendered (though having both is unusual)
+        # When both are present, TECHNICAL SKILLS takes priority and SKILLS is deduplicated
         assert 'Languages' in latex_output
-        assert 'Soft Skills' in latex_output or 'Leadership' in latex_output
+        assert 'Soft Skills' not in latex_output and 'Leadership' not in latex_output
 
     def test_technical_skills_preserves_special_characters(self):
         """Verify that special characters in skills are properly escaped"""

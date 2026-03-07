@@ -30,6 +30,7 @@ class TestFullTailoringFlow:
         mock_config.OPENAI_API_KEY = 'test_openai_key'
         mock_config.GEMINI_API_KEY = None
         mock_config.ANTHROPIC_API_KEY = 'test_claude_key'
+        mock_config.DEFAULT_USER_NAME = 'User'
         mock_config.check_api_availability.return_value = {
             'openai': True,
             'gemini': False,
@@ -45,13 +46,18 @@ class TestFullTailoringFlow:
         assert data['claude'] is True
 
     @patch('routes.resume.DocumentParser.validate_file')
-    @patch('routes.resume.os.path.join')
-    def test_upload_resume_success(self, mock_join, mock_validate, client, tmp_path):
+    def test_upload_resume_success(self, mock_validate, client, tmp_path):
         mock_validate.return_value = True
-        mock_join.return_value = str(tmp_path / 'test.pdf')
 
-        data = {'file': (open(__file__, 'rb'), 'test.pdf')}
-        response = client.post('/api/upload-resume', data=data, content_type='multipart/form-data')
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.UPLOAD_FOLDER = str(tmp_path)
+            mock_cfg.MAX_FILE_SIZE = 10485760
+            mock_cfg.ALLOWED_EXTENSIONS = {'docx', 'doc', 'pdf'}
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+
+            with open(__file__, 'rb') as f:
+                data = {'file': (f, 'test.pdf')}
+                response = client.post('/api/upload-resume', data=data, content_type='multipart/form-data')
 
         assert response.status_code == 200
         result = json.loads(response.data)
@@ -167,7 +173,7 @@ class TestFullTailoringFlow:
         client
     ):
         """Test flow where resume has low initial score but improves significantly"""
-        mock_extract_text.return_value = "Basic resume with minimal content"
+        mock_extract_text.return_value = "Basic resume with minimal content. Experienced professional with several years of work history and various technical skills."
         mock_extract_header.return_value = "[HEADER]\nJohn Doe\n"
         mock_remove_header.return_value = "Basic resume with minimal content"
 
@@ -212,11 +218,16 @@ class TestFullTailoringFlow:
             'job_title': 'Engineer',
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.ANTHROPIC_API_KEY = 'sk-ant-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -250,9 +261,9 @@ class TestFullTailoringFlow:
         client
     ):
         """Verify all score categories are returned"""
-        mock_extract_text.return_value = "Resume content"
+        mock_extract_text.return_value = "Resume content with sufficient length to pass the minimum character check for the tailoring endpoint."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume content"
+        mock_remove_header.return_value = "Resume content with sufficient length to pass the minimum character check for the tailoring endpoint."
 
         mock_provider = MagicMock()
         mock_ai_response = {
@@ -290,11 +301,16 @@ class TestFullTailoringFlow:
             'job_title': 'Role',
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.GEMINI_API_KEY = 'gm-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         data = json.loads(response.data)
 
@@ -319,9 +335,9 @@ class TestFullTailoringFlow:
         client
     ):
         """Test error handling at various points in the flow"""
-        mock_extract_text.return_value = "Resume"
+        mock_extract_text.return_value = "Resume content long enough to pass the minimum character length check for tailoring endpoint processing."
         mock_extract_header.return_value = "[HEADER]\n"
-        mock_remove_header.return_value = "Resume"
+        mock_remove_header.return_value = "Resume content long enough to pass the minimum character length check for tailoring endpoint processing."
 
         mock_provider = MagicMock()
         mock_provider.score_and_tailor_resume.side_effect = Exception("OpenAI API rate limit exceeded")
@@ -336,11 +352,16 @@ class TestFullTailoringFlow:
             'job_title': 'Role',
         }
 
-        response = client.post(
-            '/api/tailor-resume',
-            data=json.dumps(request_data),
-            content_type='application/json'
-        )
+        with patch('routes.resume.Config') as mock_cfg:
+            mock_cfg.DEFAULT_USER_NAME = 'User'
+            mock_cfg.OPENAI_API_KEY = 'sk-test'
+            mock_cfg.TEMPLATES_FOLDER = '/tmp'
+            mock_cfg.OUTPUT_FOLDER = '/tmp'
+            response = client.post(
+                '/api/tailor-resume',
+                data=json.dumps(request_data),
+                content_type='application/json'
+            )
 
         assert response.status_code == 500
         data = json.loads(response.data)

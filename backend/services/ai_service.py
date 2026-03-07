@@ -151,6 +151,68 @@ class AIProvider(ABC):
         except Exception as e:
             app_logger.warning(f"Failed to save debug response: {e}")
 
+    @staticmethod
+    def _estimate_years_of_experience(resume_text: str) -> float:
+        """
+        Estimate total years of work experience from date ranges in the resume text.
+
+        Looks for patterns like "Jan 2019 - Mar 2022", "2020 - Present", "2018 - 2021",
+        sums up all non-overlapping durations found, and returns the total in years.
+        Returns 0.0 if no date ranges are detected.
+        """
+        # Match year ranges such as:
+        #   "2018 - 2022", "Jan 2018 - Mar 2022", "January 2018 - Present"
+        pattern = re.compile(
+            r"(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+            r"\s+)?(\d{4})\s*[-–]\s*"
+            r"(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+            r"\s+)?(\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow)",
+            re.IGNORECASE,
+        )
+
+        # Only look inside the EXPERIENCE section to avoid picking up education dates
+        exp_match = re.search(
+            r"\[EXPERIENCE\](.*?)(?=\[(?:EDUCATION|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS)|$)",
+            resume_text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if exp_match:
+            experience_section = exp_match.group(1)
+        else:
+            # No explicit [EXPERIENCE] tag — truncate at the first non-experience section
+            # header so education/project dates are not counted.
+            trunc_match = re.search(
+                r"\[(?:EDUCATION|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS)\]",
+                resume_text,
+                re.IGNORECASE,
+            )
+            experience_section = resume_text[: trunc_match.start()] if trunc_match else resume_text
+
+        intervals: list[tuple[int, int]] = []
+        for m in pattern.finditer(experience_section):
+            start_year = int(m.group(1))
+            end_str = m.group(2)
+            end_year = datetime.now().year if re.match(r"[Pp]resent|[Cc]urrent|[Nn]ow", end_str) else int(end_str)
+            if end_year >= start_year:
+                # Store as exclusive-end so same-year ranges (2023-2023) count as 1 year
+                intervals.append((start_year, end_year + 1))
+
+        if not intervals:
+            return 0.0
+
+        # Merge overlapping intervals to avoid double-counting concurrent roles
+        intervals.sort()
+        merged: list[tuple[int, int]] = [intervals[0]]
+        for start, end in intervals[1:]:
+            if start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+
+        return float(sum(end - start for start, end in merged))
+
     def _create_score_and_tailor_prompt(
         self,
         resume_text: str,
@@ -177,11 +239,66 @@ This score represents the keyword overlap between the resume and job description
 Use this as context when scoring and tailoring the resume.
 """
 
+        # Determine whether to apply single-page constraint
+        years_exp = AIProvider._estimate_years_of_experience(resume_text)
+        single_page_constraint = ""
+        if years_exp < 10:
+            single_page_constraint = """
+[SINGLE-PAGE REQUIREMENT]
+This candidate has fewer than 10 years of work experience. The tailored resume MUST fit on ONE page when rendered.
+
+The PDF renderer uses the following layout — calibrate content length to fit within these constraints:
+- Page size: US Letter (8.5 x 11 in), margins: 0.5 in on all sides → usable area: 7.5 x 10 in
+- Fonts: Helvetica family (no external fonts)
+  - Candidate name: 18 pt bold, centered
+  - Contact line: 7.5 pt, centered (fits roughly 110 characters per line)
+  - Section headers: 11 pt bold uppercase + horizontal rule
+  - Subheading rows (job title / company): 10 pt, two-column table (70% left, 30% right)
+  - Sub-subheading rows (role / dates): 9 pt italic
+  - Bullet points: 9 pt, left indent 16 pt, bullet indent 6 pt
+  - Skills lines: 9 pt
+- Vertical spacing: section spaceBefore=8 pt, spaceAfter=2 pt; subheading spaceAfter=4 pt; bullet spaceAfter=1 pt
+
+To guarantee one-page fit:
+1. Limit each EXPERIENCE entry to a maximum of 3 bullet points (4 only if the entry is the sole or most recent role and there is space)
+2. Each bullet must be a SINGLE sentence of at most 120 characters (including the leading dash and space)
+3. Limit PROJECTS to 2 entries maximum, each with 2 bullet points
+4. If the resume has more than 3 EXPERIENCE entries, include only the 3 most recent/relevant ones
+5. Keep the EDUCATION entry to 2 lines (school + degree/date); omit coursework or GPA unless critical
+6. Do NOT add sections beyond those in the original resume
+"""
+
+        # Bullet-count limits — single-page branch is authoritative when active
+        if years_exp < 10:
+            exp_bullet_rule = (
+                "- Each EXPERIENCE entry: maximum 3 bullet points "
+                "(4 only for the single or most-recent role if space permits)"
+            )
+            exp_condense_rule = (
+                "- If original has more than 3 points, condense to the 3 most impactful"
+            )
+            project_bullet_rule = "- Bullet points (2 bullets per project)"
+            req_exp_bullets = "3. Each EXPERIENCE entry MUST have exactly 3 bullet points (4 only for the most-recent role if space allows)"
+            req_proj_bullets = "4. Each PROJECT entry MUST have exactly 2 bullet points"
+            req_education = "5. EDUCATION: 2 lines only (school + degree/date) — omit GPA and coursework"
+        else:
+            exp_bullet_rule = (
+                "- Each EXPERIENCE entry: 3–5 bullet points"
+            )
+            exp_condense_rule = (
+                "- If original has more than 5 points, condense the most impactful achievements into 5 points\n"
+                "- If original has fewer than 3 points, expand with relevant details"
+            )
+            project_bullet_rule = "- Bullet points (2-4 points per project)"
+            req_exp_bullets = "3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)"
+            req_proj_bullets = "4. Each PROJECT entry should have 2-4 bullet points"
+            req_education = "5. EDUCATION: include relevant details as in the original resume"
+
         return f"""You are an expert resume writer and analyst.
 
 CRITICAL: Section headers MUST use square brackets and ALL CAPS.
 Examples: [EDUCATION], [TECHNICAL SKILLS], [EXPERIENCE], [PROJECTS]
-{similarity_context}
+{similarity_context}{single_page_constraint}
 Your task is to:
 1. Score the original resume against the job description
 2. Tailor the resume to match the job description
@@ -233,13 +350,13 @@ Company Name | Location
 - Bullet points starting with "-"
 
 BULLET POINT REQUIREMENTS:
-- Each bullet point should be 1–2 lines long and max 1 sentence long
-- If original resume has more than 5 points, condense the most impactful achievements into 5 points
-- If original resume has fewer than 3 points, expand with relevant details
-- Don’t let bullets spill onto the next line with only 1–4 words on it, it’s a huge waste of space
+{exp_bullet_rule}
+{exp_condense_rule}
+- Each bullet point should be 1 sentence, max 120 characters (including the leading "- ")
+- Don't let bullets spill onto the next line with only 1–4 words on it, it's a huge waste of space
 - Each bullet point should comprise of either of the following ideologies - STAR: Situation Task Action Result,  XYZ: Accomplished X as measured by Y by doing Z or CAR: Challenge Action Result.
 - Provide context and incorporate relevant keywords. This helps the hiring team understand and relate to your work and technical achievements
-- Avoid adding unnecessary information that doesn’t add to your candidacy
+- Avoid adding unnecessary information that doesn't add to your candidacy
 - Bullet points should be ordered from most relevant/impressive to least, as some hiring managers only have time to read the first they should get THE BEST!
 - Research Action Verbs - Analyzed, Applied, Checked, Cited, Clarified, Collected, Compared, Critiqued, Deducted, Determined, Diagnosed, Discovered, Dissected, Estimated, Evaluated, Examined, Explored, Extracted, Forecasted, Formulated, Found, Gathered, Graphed, Identified, Inspected, Interpreted, Interviewed, Investigated, Isolated, Located, Observed, Predicted, Read,Researched, Reviewed, Studied, Summarized, Surveyed, Systematized
 - Technical Action Verbs - Adjusted, Advanced, Altered, Amplified, Assembled, Built, Calculated, Computed, Designed, Devised, Developed, Engineered, Excavated, Extrapolated, Fabricated, Installed, Interpreted, Maintained, Mapped, Measured, Mediated, Moderated, Motivated, Negotiated, Obtained, Operated, Overhauled, Persuaded, Plotted, Produced, Programmed, Promoted, Publicized, Reconciled, Recruited, Remodeled, Renovated, Repaired, Restored, Rotated, Solved, Synthesized, Translated, Upgraded, Wrote
@@ -261,21 +378,22 @@ WRONG: Company first, or single line with 4 parts.
 [PROJECTS]
 Project Name | Tech Stack
 Date Range
-- Bullet points (2-4 points per project)
+{project_bullet_rule}
 
 REQUIREMENTS:
 1. PRESERVE SKILLS section exactly as in original resume
 2. For EXPERIENCE/PROJECTS: Reframe to align with job description
-3. Each EXPERIENCE entry MUST have 3-5 bullet points (condense if original has more)
-4. Each PROJECT entry should have 2-4 bullet points
-5. DO NOT over-exaggerate achievements.
-6. Use "Accomplished X through Y using Z" template for bullets
-7. Use action verbs and quantify achievements (avoid repeating verbs)
-8. Use plain text - DO NOT escape special characters (%, &, $, #)
-9. Maintain professional tone and consistent tense
-10. SECTION ORDER: Output sections in this exact order: EDUCATION, TECHNICAL SKILLS, EXPERIENCE, PROJECTS
-11. Do NOT add sections that do not exist in the original resume
-{f"12. {base_instructions}" if base_instructions else ""}
+{req_exp_bullets}
+{req_proj_bullets}
+{req_education}
+6. DO NOT over-exaggerate achievements.
+7. Use "Accomplished X through Y using Z" template for bullets
+8. Use action verbs and quantify achievements (avoid repeating verbs)
+9. Use plain text - DO NOT escape special characters (%, &, $, #)
+10. Maintain professional tone and consistent tense
+11. SECTION ORDER: Output sections in this exact order: EDUCATION, TECHNICAL SKILLS, EXPERIENCE, PROJECTS
+12. Do NOT add sections that do not exist in the original resume
+{f"13. {base_instructions}" if base_instructions else ""}
 
 Original Resume:
 {resume_text}

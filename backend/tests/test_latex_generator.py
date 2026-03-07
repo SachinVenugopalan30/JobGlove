@@ -1,22 +1,9 @@
 import os
-import subprocess
 import tempfile
 
 import pytest
 
 from services.latex_generator import LaTeXGenerator
-
-
-# Check if pdflatex is available
-def is_pdflatex_available():
-    try:
-        subprocess.run(["pdflatex", "--version"], capture_output=True, timeout=5, check=True)
-        return True
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
-        return False
-
-
-PDFLATEX_AVAILABLE = is_pdflatex_available()
 
 
 @pytest.mark.unit
@@ -142,7 +129,6 @@ class TestLaTeXGenerator:
         assert r"\textbf{" in result
         assert "}" in result
 
-    @pytest.mark.skipif(not PDFLATEX_AVAILABLE, reason="pdflatex not available")
     def test_generate_latex_filename_with_user_info(self):
         """Test filename generation with user info"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -172,7 +158,6 @@ class TestLaTeXGenerator:
             assert "Software_Engineer" in filename
             assert filename.endswith("_resume")
 
-    @pytest.mark.skipif(not PDFLATEX_AVAILABLE, reason="pdflatex not available")
     def test_generate_latex_filename_sanitization(self):
         """Test filename sanitization removes special characters"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -201,7 +186,6 @@ class TestLaTeXGenerator:
             assert "&" not in filename
             assert "." not in filename.replace(".pdf", "")
 
-    @pytest.mark.skipif(not PDFLATEX_AVAILABLE, reason="pdflatex not available")
     def test_generate_latex_filename_without_user_info(self):
         """Test filename generation without user info uses UUID"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -222,6 +206,34 @@ class TestLaTeXGenerator:
             # UUID format: 8-4-4-4-12 hex digits
             assert len(filename) == 36
             assert filename.count("-") == 4
+
+    def test_generate_latex_creates_valid_pdf(self):
+        """Test that generate_latex produces a valid PDF file using reportlab."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = os.path.join(tmpdir, "template.tex")
+            with open(template_path, "w") as f:
+                f.write("{{RESUME_CONTENT}}")
+
+            resume_text = (
+                "[HEADER]\nJohn Doe\nemail@example.com | github.com/johndoe\n\n"
+                "[EXPERIENCE]\nSoftware Engineer | Jan 2023 - Present\nAcme Corp | Remote\n"
+                "- Built scalable systems serving 50% more traffic\n\n"
+                "[TECHNICAL SKILLS]\nLanguages: Python, JavaScript\n"
+            )
+            pdf_path, tex_path = LaTeXGenerator.generate_latex(
+                resume_text,
+                template_path,
+                tmpdir,
+                user_name="John Doe",
+                company="Acme Corp",
+                job_title="Software Engineer",
+            )
+
+            assert os.path.exists(pdf_path)
+            assert os.path.getsize(pdf_path) > 0
+            with open(pdf_path, "rb") as f:
+                assert f.read(4) == b"%PDF"
+            assert os.path.exists(tex_path)
 
     def test_parse_structured_resume(self, sample_resume_text):
         """Test parsing structured resume text"""

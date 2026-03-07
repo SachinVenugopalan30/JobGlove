@@ -6,24 +6,61 @@ import fitz
 
 class DocumentParser:
     @staticmethod
+    def _split_header_body(resume_text: str) -> tuple[list[str], list[str]]:
+        """
+        Split resume text into header lines and body lines.
+
+        Header is the leading block of non-empty lines before the first blank line.
+        If there is no blank line, only the first non-empty line is treated as the header.
+        """
+        raw_lines = resume_text.split('\n')
+        header_lines: list[str] = []
+        body_lines: list[str] = []
+
+        # Ignore leading blank lines, then collect header until the first blank
+        # line that follows at least one non-empty header line.
+        header_started = False
+        blank_found = False
+        for line in raw_lines:
+            stripped = line.strip()
+            if not header_started:
+                # Skip leading blank lines before the header block begins
+                if stripped == '':
+                    continue
+                header_started = True
+                header_lines.append(stripped)
+            elif not blank_found:
+                if stripped == '':
+                    blank_found = True
+                else:
+                    header_lines.append(stripped)
+            else:
+                body_lines.append(line)
+
+        # No blank separator found: treat only the first non-empty line as header
+        if not blank_found and len(header_lines) > 1:
+            body_lines = header_lines[1:]
+            header_lines = header_lines[:1]
+
+        return header_lines, body_lines
+
+    @staticmethod
     def extract_header(resume_text: str) -> str:
         """Extract header (name and contact info) from resume"""
-        lines = [line.strip() for line in resume_text.split('\n') if line.strip()]
-        if len(lines) >= 2:
-            return f"[HEADER]\n{lines[0]}\n{lines[1]}\n"
-        elif len(lines) == 1:
-            return f"[HEADER]\n{lines[0]}\n"
-        return ""
+        if not resume_text:
+            return ""
+        header_lines, _ = DocumentParser._split_header_body(resume_text)
+        if not header_lines:
+            return ""
+        return "[HEADER]\n" + "\n".join(header_lines) + "\n"
 
     @staticmethod
     def remove_header(resume_text: str) -> str:
         """Remove header from resume text for privacy"""
-        lines = [line.strip() for line in resume_text.split('\n') if line.strip()]
-        if len(lines) >= 2:
-            return '\n'.join(lines[2:])
-        elif len(lines) == 1:
-            return '\n'.join(lines[1:])
-        return resume_text
+        if not resume_text:
+            return resume_text
+        _, body_lines = DocumentParser._split_header_body(resume_text)
+        return '\n'.join(body_lines).strip()
 
     @staticmethod
     def extract_text_from_pdf(file_path: str) -> str | None:
